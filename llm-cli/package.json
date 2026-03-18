@@ -1,0 +1,17 @@
+{
+  "name": "blueorch-llm-cli",
+  "version": "1.0.0",
+  "description": "BlueOrch LLM CLI — Gemini and Ollama with a shared MCP client",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "gemini": "node main.js --model gemini",
+    "ollama": "node main.js --model ollama"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@google/generative-ai": "^0.21.0",
+    "ollama": "^0.5.0",
+    "dotenv": "^16.0.0"
+  }
+}

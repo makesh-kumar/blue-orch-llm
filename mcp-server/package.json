@@ -1,0 +1,13 @@
+{
+  "name": "blueorch-mcp-server",
+  "version": "1.0.0",
+  "description": "BlueOrch MCP Server - Product & Order Management",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
