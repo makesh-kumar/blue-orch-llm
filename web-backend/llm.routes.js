@@ -19,20 +19,34 @@ export const getActiveConfig = () => {
 };
 
 // ─── POST /api/llm/verify ─────────────────────────────────────────────────────
-// Body:    { provider: 'gemini'|'openai'|'claude', model: string, apiKey: string }
+// Body:    { provider, model, apiKey?, baseUrl? }
 // Returns: { success: true, id, provider, model, latency, verifiedAt }
 router.post('/verify', async (req, res) => {
-  const { provider, model, apiKey } = req.body;
+  const { provider, model, apiKey, baseUrl } = req.body;
+  const ollamaBase = (baseUrl ?? 'http://localhost:11434').replace(/\/$/, '');
 
-  if (!provider || !model || !apiKey) {
-    return res.status(400).json({ error: 'provider, model, and apiKey are required' });
+  if (!provider || !model) {
+    return res.status(400).json({ error: 'provider and model are required' });
+  }
+  if (provider !== 'ollama' && !apiKey) {
+    return res.status(400).json({ error: 'apiKey is required for cloud providers' });
   }
 
   const start = Date.now();
   console.log(`[INIT] ${ts()} Verifying LLM | provider: ${provider} | model: ${model}`);
 
   try {
-    if (provider === 'gemini') {
+    if (provider === 'ollama') {
+      // Ping /api/tags — lists local models, confirms Ollama is running
+      const resp = await fetch(`${ollamaBase}/api/tags`);
+      if (!resp.ok) throw new Error(`Ollama responded with HTTP ${resp.status}`);
+      const data = await resp.json();
+      const available = (data.models ?? []).map(m => m.name);
+      if (!available.includes(model)) {
+        throw new Error(`Model "${model}" not found in Ollama. Available: ${available.join(', ') || 'none'}`);
+      }
+
+    } else if (provider === 'gemini') {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
       const genModel = genAI.getGenerativeModel({ model });
@@ -63,7 +77,12 @@ router.post('/verify', async (req, res) => {
     const id = randomUUID();
     const verifiedAt = new Date().toISOString();
 
-    connectedLlmRegistry.set(id, { id, provider, model, apiKey, latency, verifiedAt });
+    connectedLlmRegistry.set(id, {
+      id, provider, model,
+      apiKey: apiKey ?? '',
+      ...(provider === 'ollama' && { baseUrl: ollamaBase }),
+      latency, verifiedAt,
+    });
 
     // Auto-promote to active if this is the first entry in the registry
     if (!llmState.activeLlmId) {
@@ -128,6 +147,25 @@ router.get('/active', (_req, res) => {
   const { id, provider, model, latency, verifiedAt } = connectedLlmRegistry.get(llmState.activeLlmId);
   console.log(`[SUCCESS] ${ts()} Active LLM retrieved | id: ${id} | provider: ${provider} | model: ${model}`);
   return res.json({ id, provider, model, latency, verifiedAt });
+});
+
+// ─── GET /api/llm/ollama/models ───────────────────────────────────────────────
+// Query: ?baseUrl=http://localhost:11434
+// Returns the list of locally pulled models from Ollama.
+router.get('/ollama/models', async (req, res) => {
+  const baseUrl = ((req.query.baseUrl ?? 'http://localhost:11434')).replace(/\/$/, '');
+  console.log(`[INIT] ${ts()} Fetching Ollama models | baseUrl: ${baseUrl}`);
+  try {
+    const resp = await fetch(`${baseUrl}/api/tags`);
+    if (!resp.ok) throw new Error(`Ollama responded with HTTP ${resp.status}`);
+    const data = await resp.json();
+    const models = (data.models ?? []).map(m => ({ name: m.name, size: m.size }));
+    console.log(`[SUCCESS] ${ts()} Ollama models fetched | ${models.length} model(s)`);
+    return res.json({ models });
+  } catch (err) {
+    console.error(`[ERROR] ${ts()} Failed to fetch Ollama models | ${err.message}`);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

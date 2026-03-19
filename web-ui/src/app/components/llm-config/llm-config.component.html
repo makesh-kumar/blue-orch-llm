@@ -19,13 +19,43 @@
             <option value="gemini">Gemini (Google)</option>
             <option value="openai">OpenAI</option>
             <option value="claude">Claude (Anthropic)</option>
+            <option value="ollama">Ollama (Local)</option>
           </select>
           <div class="invalid-feedback">Please select a provider.</div>
+        </div>
+
+        <!-- Base URL (Ollama only) -->
+        <div class="mb-2" *ngIf="isOllamaProvider">
+          <label class="form-label fw-semibold small mb-1">Base URL</label>
+          <input type="text"
+                 class="form-control font-monospace"
+                 formControlName="baseUrl"
+                 placeholder="http://localhost:11434">
+          <div class="form-text text-muted">Default: http://localhost:11434</div>
         </div>
 
         <!-- Model -->
         <div class="mb-2">
           <label class="form-label fw-semibold small mb-1">Model</label>
+
+          <!-- Ollama: Fetch button + status -->
+          <div *ngIf="isOllamaProvider" class="d-flex gap-2 mb-1">
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    (click)="fetchOllamaModels()"
+                    [disabled]="ollamaFetchStatus === 'fetching'">
+              <span *ngIf="ollamaFetchStatus === 'fetching'"
+                    class="spinner-border spinner-border-sm me-1" role="status"></span>
+              <i *ngIf="ollamaFetchStatus !== 'fetching'" class="bi bi-clouddownload me-1"></i>
+              {{ ollamaFetchStatus === 'fetching' ? 'Fetching...' : 'Fetch Models' }}
+            </button>
+            <span *ngIf="ollamaFetchStatus === 'error'" class="small text-danger align-self-center">
+              <i class="bi bi-exclamation-circle me-1"></i>Could not reach Ollama
+            </span>
+            <span *ngIf="ollamaFetchStatus === 'done'" class="small text-success align-self-center">
+              <i class="bi bi-check-circle me-1"></i>{{ ollamaModels.length }} model(s) found
+            </span>
+          </div>
           <select class="form-select"
                   formControlName="model"
                   [class.is-invalid]="llmForm.get('model')!.invalid && llmForm.get('model')!.touched">
@@ -48,8 +78,8 @@
           <div class="invalid-feedback">Please enter a custom model ID.</div>
         </div>
 
-        <!-- API Key -->
-        <div class="mb-4">
+        <!-- API Key (hidden for Ollama) -->
+        <div class="mb-4" *ngIf="!isOllamaProvider">
           <label class="form-label fw-semibold small mb-1">API Key</label>
           <input type="password"
                  class="form-control font-monospace"
@@ -134,6 +164,7 @@
                 <span class="d-flex align-items-center gap-2">
                   <i class="bi text-primary" [ngClass]="providerIconClass(entry.provider)"></i>
                   <span class="fw-semibold">{{ providerLabel(entry.provider) }}</span>
+                  <span *ngIf="entry.provider === 'ollama'" class="badge bg-secondary">Local</span>
                 </span>
               </td>
               <!-- Model -->

@@ -9,6 +9,7 @@ export interface LlmConfig {
   provider: string;
   model: string;
   apiKey: string;
+  baseUrl?: string;
 }
 
 export interface LlmVerifyResponse {
@@ -70,6 +71,15 @@ export class LlmService {
     return this.http
       .delete<{ success: boolean; activeId: string | null }>(`${this.apiUrl}/${id}`)
       .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} LlmService.deleteEntry() | new activeId: ${res.activeId}`)));
+  }
+
+  fetchOllamaModels(baseUrl: string): Observable<{ models: { name: string; size: number }[] }> {
+    console.log(`[INIT] ${new Date().toISOString()} LlmService.fetchOllamaModels() | baseUrl: ${baseUrl}`);
+    return this.http
+      .get<{ models: { name: string; size: number }[] }>(
+        `${this.apiUrl}/ollama/models?baseUrl=${encodeURIComponent(baseUrl)}`
+      )
+      .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} LlmService.fetchOllamaModels() | ${res.models.length} models`)));
   }
 }
 

@@ -32,6 +32,10 @@ export class LlmConfigComponent implements OnInit {
   llmForm!: FormGroup;
   modelOptions: { label: string; value: string }[] = [];
 
+  // ── Ollama
+  ollamaModels: { name: string; size: number }[] = [];
+  ollamaFetchStatus: 'idle' | 'fetching' | 'done' | 'error' = 'idle';
+
   // ── Verify status
   verifyStatus: 'idle' | 'verifying' | 'success' | 'error' = 'idle';
   verifyLatency: number | null = null;
@@ -51,6 +55,7 @@ export class LlmConfigComponent implements OnInit {
       model:       ['', Validators.required],
       customModel: [''],
       apiKey:      [keyFromLocalStorage, Validators.required],
+      baseUrl:     ['http://localhost:11434'],
     });
   }
 
@@ -79,6 +84,16 @@ export class LlmConfigComponent implements OnInit {
     this.verifyStatus = 'idle';
     this.verifyLatency = null;
     this.verifyError = '';
+
+    const apiKeyCtrl = this.llmForm.get('apiKey')!;
+    if (provider === 'ollama') {
+      apiKeyCtrl.clearValidators();
+      this.ollamaModels = [];
+      this.ollamaFetchStatus = 'idle';
+    } else {
+      apiKeyCtrl.setValidators([Validators.required]);
+    }
+    apiKeyCtrl.updateValueAndValidity();
     console.log(`[INIT] ${new Date().toISOString()} Provider changed | provider: ${provider}`);
   }
 
@@ -86,14 +101,37 @@ export class LlmConfigComponent implements OnInit {
     return this.llmForm.get('model')!.value === 'other';
   }
 
+  get isOllamaProvider(): boolean {
+    return this.llmForm.get('provider')!.value === 'ollama';
+  }
+
+  // ── Fetch Ollama models ────────────────────────────────────────────────────
+  fetchOllamaModels(): void {
+    const baseUrl = (this.llmForm.get('baseUrl')!.value as string).trim() || 'http://localhost:11434';
+    this.ollamaFetchStatus = 'fetching';
+    console.log(`[INIT] ${new Date().toISOString()} fetchOllamaModels() | baseUrl: ${baseUrl}`);
+    this.llmService.fetchOllamaModels(baseUrl).subscribe({
+      next: (res) => {
+        this.ollamaModels = res.models;
+        this.modelOptions = res.models.map(m => ({ label: m.name, value: m.name }));
+        this.ollamaFetchStatus = 'done';
+        console.log(`[SUCCESS] ${new Date().toISOString()} Ollama models fetched | ${res.models.length} models`);
+      },
+      error: (err) => {
+        this.ollamaFetchStatus = 'error';
+        console.log(`[ERROR] ${new Date().toISOString()} Failed to fetch Ollama models | ${err.message}`);
+      },
+    });
+  }
+
   // ── Provider display helpers ───────────────────────────────────────────────
   providerLabel(provider: string): string {
-    const map: Record<string, string> = { gemini: 'Gemini', openai: 'OpenAI', claude: 'Claude' };
+    const map: Record<string, string> = { gemini: 'Gemini', openai: 'OpenAI', claude: 'Claude', ollama: 'Ollama (Local)' };
     return map[provider] ?? provider;
   }
 
   providerIconClass(provider: string): string {
-    const map: Record<string, string> = { gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu' };
+    const map: Record<string, string> = { gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu', ollama: 'bi-hdd-fill' };
     return map[provider] ?? 'bi-box';
   }
 
@@ -107,8 +145,8 @@ export class LlmConfigComponent implements OnInit {
       this.llmForm.markAllAsTouched();
       return;
     }
-    const { provider, model, customModel, apiKey } = this.llmForm.value as {
-      provider: string; model: string; customModel: string; apiKey: string;
+    const { provider, model, customModel, apiKey, baseUrl } = this.llmForm.value as {
+      provider: string; model: string; customModel: string; apiKey: string; baseUrl: string;
     };
     const resolvedModel = model === 'other' ? customModel.trim() : model;
     if (!resolvedModel) {
@@ -121,7 +159,10 @@ export class LlmConfigComponent implements OnInit {
     this.verifyError = '';
     console.log(`[INIT] ${new Date().toISOString()} verifyLlm() | provider: ${provider} | model: ${resolvedModel}`);
 
-    this.llmService.verify({ provider, model: resolvedModel, apiKey }).subscribe({
+    const verifyPayload = { provider, model: resolvedModel, apiKey,
+      ...(provider === 'ollama' && { baseUrl: baseUrl || 'http://localhost:11434' })
+    };
+    this.llmService.verify(verifyPayload).subscribe({
       next: (res: LlmVerifyResponse) => {
         this.verifyStatus = 'success';
         this.verifyLatency = res.latency;

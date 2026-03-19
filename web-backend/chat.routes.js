@@ -210,6 +210,64 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
   return response.content.find(b => b.type === 'text')?.text ?? '';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleOllama({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed }) {
+  const OpenAI = (await import('openai')).default;
+  const openai = new OpenAI({
+    baseURL: `${baseUrl ?? 'http://localhost:11434'}/v1`,
+    apiKey: 'ollama',
+  });
+
+  const tools = toolDefs.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description ?? '',
+      parameters: t.inputSchema ?? { type: 'object', properties: {} },
+    },
+  }));
+
+  const messages = [
+    ...history.map(h => ({ role: h.role, content: h.content })),
+    { role: 'user', content: message },
+  ];
+
+  let response = await openai.chat.completions.create({
+    model,
+    messages,
+    ...(tools.length > 0 && { tools, tool_choice: 'auto' }),
+  });
+
+  // ── Agentic tool loop ────────────────────────────────────────────────────────
+  while (response.choices[0].finish_reason === 'tool_calls') {
+    const assistantMsg = response.choices[0].message;
+    messages.push(assistantMsg);
+
+    for (const tc of assistantMsg.tool_calls) {
+      toolsUsed.push(tc.function.name);
+      console.log(`[INIT] ${ts()} Ollama → tool: ${tc.function.name}`);
+      let content;
+      try {
+        const args = JSON.parse(tc.function.arguments);
+        const raw = await executeTool(tc.function.name, args);
+        content = extractToolText(raw);
+        console.log(`[SUCCESS] ${ts()} Tool "${tc.function.name}" returned`);
+      } catch (err) {
+        content = JSON.stringify({ error: err.message });
+        console.log(`[ERROR] ${ts()} Tool "${tc.function.name}" failed: ${err.message}`);
+      }
+      messages.push({ role: 'tool', tool_call_id: tc.id, content });
+    }
+
+    response = await openai.chat.completions.create({
+      model, messages, tools, tool_choice: 'auto',
+    });
+  }
+
+  return response.choices[0].message.content ?? '';
+}
+
 // ─── POST /api/chat/send ──────────────────────────────────────────────────────
 // Body: { message, providerId, activeTools: [{ connectionId, toolName }] }
 router.post('/send', async (req, res) => {
@@ -227,7 +285,7 @@ router.post('/send', async (req, res) => {
     return res.status(404).json({ error: `Provider "${providerId}" not found in registry` });
   }
 
-  const { provider, model, apiKey } = llmConfig;
+  const { provider, model, apiKey, baseUrl } = llmConfig;
 
   // ── Build tool definitions and executor lookup ────────────────────────────
   const toolLookup = {};   // toolName → connectionId
@@ -260,6 +318,7 @@ router.post('/send', async (req, res) => {
     if      (provider === 'gemini') reply = await handleGemini(commonArgs);
     else if (provider === 'openai') reply = await handleOpenAI(commonArgs);
     else if (provider === 'claude') reply = await handleClaude(commonArgs);
+    else if (provider === 'ollama') reply = await handleOllama({ ...commonArgs, baseUrl });
     else return res.status(400).json({ error: `Unknown provider: "${provider}"` });
 
     // Persist to session history
