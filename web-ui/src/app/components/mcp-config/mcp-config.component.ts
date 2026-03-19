@@ -1,12 +1,12 @@
-import { Component, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { McpService, McpTool, ActiveConnection, ConnectResponse, LogsResponse } from '../../services/mcp.service';
 
 @Component({
-  selector: 'app-mcp-dashboard',
-  templateUrl: './mcp-dashboard.component.html',
-  styleUrls: ['./mcp-dashboard.component.scss'],
+  selector: 'app-mcp-config',
+  templateUrl: './mcp-config.component.html',
+  styleUrls: ['./mcp-config.component.scss'],
 })
-export class McpDashboardComponent implements OnDestroy {
+export class McpConfigComponent implements OnInit, OnDestroy {
   // ── Connection state
   command = 'node';
   argsInput = '../mcp-server/server.js';
@@ -35,27 +35,37 @@ export class McpDashboardComponent implements OnDestroy {
   private logsInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(private mcpService: McpService) {
-    console.log(`[INIT] ${new Date().toISOString()} McpDashboardComponent initialized`);
+    console.log(`[INIT] ${new Date().toISOString()} McpConfigComponent initialized`);
+  }
+
+  ngOnInit(): void {
+    // Reload any existing connections that were made before a browser refresh
+    this.mcpService.getClients().subscribe({
+      next: (clients) => {
+        this.connections = clients;
+        console.log(`[SUCCESS] ${new Date().toISOString()} McpConfigComponent loaded ${clients.length} existing connection(s)`);
+      },
+      error: err => console.log(`[ERROR] ${new Date().toISOString()} McpConfigComponent failed to load connections | ${err.message}`),
+    });
   }
 
   ngOnDestroy(): void {
     this.stopLogsPolling();
   }
 
-  // ── Logs polling ────────────────────────────────────────────
+  // ── Logs polling ─────────────────────────────────────────────────────────
   private startLogsPolling(connectionId: string): void {
     this.stopLogsPolling();
     this.logsInterval = setInterval(() => {
       this.mcpService.getLogs(connectionId).subscribe({
         next: (res: LogsResponse) => {
           this.serverLogs = res.logs;
-          // Auto-scroll the logs terminal to the bottom
           setTimeout(() => {
             const el = this.logsTerminalRef?.nativeElement;
             if (el) el.scrollTop = el.scrollHeight;
           }, 0);
         },
-        error: () => {}, // Swallow polling errors silently
+        error: () => {},
       });
     }, 1500);
   }
@@ -75,7 +85,7 @@ export class McpDashboardComponent implements OnDestroy {
     });
   }
 
-  // ── Connect ──────────────────────────────────────────────
+  // ── Connect ──────────────────────────────────────────────────────────────
   connect(): void {
     if (!this.command.trim()) { return; }
     const argsArray = this.argsInput.trim().split(/\s+/).filter(a => a.length > 0);
@@ -93,7 +103,7 @@ export class McpDashboardComponent implements OnDestroy {
         });
         this.isConnecting = false;
         this.selectConnection(res.connectionId);
-        console.log(`[SUCCESS] ${new Date().toISOString()} Dashboard connected | id: ${res.connectionId}`);
+        console.log(`[SUCCESS] ${new Date().toISOString()} McpConfigComponent connected | id: ${res.connectionId}`);
       },
       error: (err) => {
         this.showAlert(err.error?.error ?? 'Failed to connect. Check command and args.');
@@ -102,7 +112,7 @@ export class McpDashboardComponent implements OnDestroy {
     });
   }
 
-  // ── Select connection ────────────────────────────────────────
+  // ── Select connection ────────────────────────────────────────────────────
   selectConnection(id: string): void {
     this.selectedConnectionId = id;
     this.selectedTool = null;
@@ -118,7 +128,7 @@ export class McpDashboardComponent implements OnDestroy {
     this.startLogsPolling(id);
   }
 
-  // ── Toggle tool expand / collapse ──────────────────────────────
+  // ── Toggle tool expand / collapse ────────────────────────────────────────
   selectTool(tool: McpTool): void {
     if (this.selectedTool?.name === tool.name) {
       this.selectedTool = null;
@@ -138,7 +148,7 @@ export class McpDashboardComponent implements OnDestroy {
     this.toolArgsJson = JSON.stringify(defaults, null, 2);
   }
 
-  // ── Execute tool ─────────────────────────────────────────────
+  // ── Execute tool ─────────────────────────────────────────────────────────
   runTool(): void {
     if (!this.selectedTool || !this.selectedConnectionId) { return; }
     let args: object = {};
@@ -165,7 +175,7 @@ export class McpDashboardComponent implements OnDestroy {
     });
   }
 
-  // ── Disconnect ─────────────────────────────────────────────
+  // ── Disconnect ───────────────────────────────────────────────────────────
   disconnect(connectionId: string, event: MouseEvent): void {
     event.stopPropagation();
     if (this.selectedConnectionId === connectionId) {
@@ -188,7 +198,7 @@ export class McpDashboardComponent implements OnDestroy {
     });
   }
 
-  // ── Alert helpers ──────────────────────────────────────────
+  // ── Alert helpers ────────────────────────────────────────────────────────
   showAlert(msg: string): void {
     this.errorMessage = msg;
     this.showError = true;

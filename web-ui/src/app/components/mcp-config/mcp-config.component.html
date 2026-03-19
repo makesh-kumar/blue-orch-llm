@@ -1,0 +1,239 @@
+<!-- ── Error Alert ──────────────────────────────────────────────────────────── -->
+<div *ngIf="showError"
+     class="alert alert-danger alert-dismissible fade show mb-3 flex-shrink-0"
+     role="alert">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ errorMessage }}
+  <button type="button" class="btn-close" (click)="dismissError()"></button>
+</div>
+
+<!-- ── Main Row ──────────────────────────────────────────────────────────────── -->
+<div class="row g-3 mcp-row">
+
+  <!-- ── Left Sidebar ────────────────────────────────────────────────────────── -->
+  <div class="col-lg-4 sidebar-col">
+
+    <!-- Connect Form -->
+    <div class="card shadow-sm mb-2">
+      <div class="card-header bg-primary text-white fw-semibold">
+        <i class="bi bi-plug-fill me-2"></i>Connect to Server
+      </div>
+      <div class="card-body py-2">
+        <!-- Command + presets -->
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-1">Command</label>
+          <div class="d-flex gap-1 align-items-center">
+            <input type="text"
+                   class="form-control form-control-sm font-monospace"
+                   style="max-width:90px;"
+                   [(ngModel)]="command"
+                   placeholder="node"
+                   (keyup.enter)="connect()">
+            <button class="btn btn-outline-secondary btn-sm"
+                    (click)="command = 'node'"
+                    [class.active]="command === 'node'">node</button>
+            <button class="btn btn-outline-secondary btn-sm"
+                    (click)="command = 'npx'"
+                    [class.active]="command === 'npx'">npx</button>
+          </div>
+        </div>
+        <!-- Args -->
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-1">Args <span class="fw-normal">(space-separated)</span></label>
+          <input type="text"
+                 class="form-control form-control-sm font-monospace"
+                 [(ngModel)]="argsInput"
+                 placeholder="server path or name"
+                 (keyup.enter)="connect()">
+        </div>
+        <button class="btn btn-primary w-100 mt-1"
+                (click)="connect()"
+                [disabled]="isConnecting">
+          <span *ngIf="isConnecting"
+                class="spinner-border spinner-border-sm me-2"
+                role="status"></span>
+          <i *ngIf="!isConnecting" class="bi bi-power me-2"></i>
+          {{ isConnecting ? 'Connecting...' : 'Connect' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Connections List -->
+    <div class="card shadow-sm connections-card">
+      <div class="card-header fw-semibold bg-white d-flex align-items-center">
+        <i class="bi bi-hdd-network me-2 text-primary"></i>
+        Active Servers
+        <span class="badge bg-primary ms-auto">{{ connections.length }}</span>
+      </div>
+      <div class="connections-list list-group list-group-flush">
+        <div *ngIf="connections.length === 0"
+             class="list-group-item text-muted small text-center py-4">
+          <i class="bi bi-cloud-slash d-block fs-4 mb-2 opacity-50"></i>
+          No active connections
+        </div>
+        <div *ngFor="let conn of connections"
+             class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-1"
+             [class.active]="selectedConnectionId === conn.connectionId"
+             (click)="selectConnection(conn.connectionId)"
+             style="cursor: pointer;">
+          <span class="text-success">
+            <i class="bi bi-circle-fill" style="font-size:0.55rem"></i>
+          </span>
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="fw-semibold small text-truncate">{{ conn.label }}</div>
+            <div class="small opacity-75 font-monospace text-truncate">{{ conn.command }} {{ conn.args.join(' ') }}</div>
+            <div class="small opacity-75">{{ conn.toolCount }} tool{{ conn.toolCount !== 1 ? 's' : '' }}</div>
+          </div>
+          <button class="btn btn-sm p-0 ms-auto opacity-50"
+                  [class.text-white]="selectedConnectionId === conn.connectionId"
+                  [class.text-danger]="selectedConnectionId !== conn.connectionId"
+                  title="Disconnect"
+                  (click)="disconnect(conn.connectionId, $event)">
+            <i class="bi bi-x-circle"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <!-- /col-lg-3 -->
+
+  <!-- ── Main Panel ──────────────────────────────────────────────────────────── -->
+  <div class="col-lg-8 main-col">
+
+    <!-- Empty state -->
+    <div *ngIf="!selectedConnectionId"
+         class="card shadow-sm text-center py-5 text-muted border-dashed">
+      <i class="bi bi-arrow-left-circle fs-1 d-block mb-3 text-primary opacity-35"></i>
+      <p class="mb-1 fw-semibold">No server selected</p>
+      <p class="small mb-0">Connect to an MCP server and select it from the sidebar.</p>
+    </div>
+
+    <ng-container *ngIf="selectedConnectionId">
+
+      <!-- ── Tool Explorer ──────────────────────────────────────────────────── -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold d-flex align-items-center">
+          <i class="bi bi-tools me-2 text-primary"></i>
+          Tool Explorer
+          <span class="badge bg-secondary ms-2">{{ tools.length }}</span>
+        </div>
+
+        <div class="tools-scroll-area">
+
+          <div *ngFor="let tool of tools; let last = last"
+               [class.border-bottom]="!last">
+
+            <div class="d-flex align-items-center px-3 py-2 tool-header"
+                 [class.tool-active]="selectedTool?.name === tool.name"
+                 (click)="selectTool(tool)"
+                 style="cursor: pointer;">
+              <i class="bi bi-gear-fill text-primary me-2 flex-shrink-0"></i>
+              <span class="fw-semibold small flex-grow-1">{{ tool.name }}</span>
+              <i class="bi ms-2 text-muted"
+                 [class.bi-chevron-down]="selectedTool?.name !== tool.name"
+                 [class.bi-chevron-up]="selectedTool?.name === tool.name"></i>
+            </div>
+
+            <div *ngIf="selectedTool?.name === tool.name"
+                 class="px-3 pb-3 pt-1 bg-light border-top">
+              <p class="text-muted small mb-2">{{ tool.description }}</p>
+              <pre class="bg-white rounded border p-3 small mb-0"
+                   style="max-height:180px; overflow-y:auto;">{{ tool.inputSchema | json }}</pre>
+            </div>
+
+          </div>
+
+          <div *ngIf="tools.length === 0"
+               class="p-4 text-center text-muted small">
+            <span class="spinner-border spinner-border-sm me-2"></span>Loading tools...
+          </div>
+        </div>
+      </div>
+      <!-- /Tool Explorer -->
+
+      <!-- ── Execution Console ──────────────────────────────────────────────── -->
+      <div class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold d-flex align-items-center">
+          <i class="bi bi-terminal-fill me-2 text-primary"></i>
+          Execution Console
+          <span *ngIf="selectedTool" class="badge bg-primary ms-2">{{ selectedTool.name }}</span>
+        </div>
+        <div class="card-body">
+
+          <div *ngIf="!selectedTool" class="text-muted small text-center py-3">
+            <i class="bi bi-hand-index-thumb d-block fs-4 mb-2 opacity-50"></i>
+            Select a tool above to run it
+          </div>
+
+          <ng-container *ngIf="selectedTool">
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold small">
+                Arguments
+                <span class="text-muted fw-normal">(JSON object)</span>
+              </label>
+              <textarea class="form-control font-monospace small"
+                        rows="5"
+                        [(ngModel)]="toolArgsJson"
+                        spellcheck="false"
+                        placeholder='{ "productNames": ["Yoga Mat"] }'></textarea>
+            </div>
+
+            <button class="btn btn-primary mb-4"
+                    (click)="runTool()"
+                    [disabled]="isExecuting">
+              <span *ngIf="isExecuting"
+                    class="spinner-border spinner-border-sm me-2"
+                    role="status"></span>
+              <i *ngIf="!isExecuting" class="bi bi-play-fill me-1"></i>
+              {{ isExecuting ? 'Running...' : 'Run Tool' }}
+            </button>
+
+            <div>
+              <label class="form-label fw-semibold small">
+                <i class="bi bi-terminal me-1"></i>Response
+              </label>
+              <pre class="response-terminal rounded p-3 font-monospace small mb-0"
+                   style="min-height: 130px; max-height: 420px; overflow-y: auto;">{{ toolResult || '// awaiting execution...' }}</pre>
+            </div>
+
+          </ng-container>
+        </div>
+      </div>
+      <!-- /Execution Console -->
+
+      <!-- ── Server Logs ──────────────────────────────────────────────────────── -->
+      <div class="card shadow-sm flex-shrink-0">
+        <div class="card-header bg-white fw-semibold d-flex align-items-center">
+          <i class="bi bi-list-ul me-2 text-primary"></i>
+          Server Logs
+          <span class="badge bg-secondary ms-2">{{ serverLogs.length }}</span>
+          <div class="ms-auto d-flex align-items-center gap-2">
+            <span class="live-dot"></span>
+            <span class="small text-muted">Live</span>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1"
+                    (click)="clearServerLogs()" title="Clear logs">
+              <i class="bi bi-trash3 me-1"></i>Clear
+            </button>
+          </div>
+        </div>
+        <div class="logs-terminal p-3 font-monospace small" #logsTerminal>
+          <div *ngIf="serverLogs.length === 0" class="log-empty">
+            // No logs yet — they will appear here as tools are called
+          </div>
+          <div *ngFor="let log of serverLogs"
+               class="log-line"
+               [class.log-success]="log.includes('[SUCCESS]')"
+               [class.log-error]="log.includes('[ERROR]')"
+               [class.log-bridge]="log.includes('[BRIDGE]')"
+               [class.log-init]="log.includes('[INIT]') || log.includes('[TOOL_CALL]')"
+          >{{ log }}</div>
+        </div>
+      </div>
+      <!-- /Server Logs -->
+
+    </ng-container>
+  </div>
+  <!-- /col-lg-9 -->
+
+</div>

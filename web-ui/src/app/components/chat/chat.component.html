@@ -1,0 +1,196 @@
+<div class="chat-wrapper">
+
+  <!-- ── Left Sidebar ─────────────────────────────────────────────────────── -->
+  <div class="chat-sidebar">
+
+    <!-- Model Selector -->
+    <div class="sidebar-section border-bottom p-3">
+      <p class="section-title mb-2">
+        <i class="bi bi-cpu-fill text-primary me-2"></i>Model
+      </p>
+
+      <div *ngIf="providers.length === 0" class="text-muted small text-center py-2">
+        <i class="bi bi-exclamation-circle d-block mb-1 fs-5 opacity-50"></i>
+        No providers verified.<br>
+        Go to <strong>LLM Config</strong> tab.
+      </div>
+
+      <select *ngIf="providers.length > 0"
+              class="form-select form-select-sm"
+              [(ngModel)]="selectedProviderId">
+        <option value="" disabled>Select a model...</option>
+        <option *ngFor="let p of providers" [value]="p.id">
+          <ng-container [ngSwitch]="p.provider">
+            <ng-container *ngSwitchCase="'gemini'">Gemini</ng-container>
+            <ng-container *ngSwitchCase="'openai'">OpenAI</ng-container>
+            <ng-container *ngSwitchCase="'claude'">Claude</ng-container>
+            <ng-container *ngSwitchDefault>{{ p.provider }}</ng-container>
+          </ng-container>
+          — {{ p.model }}
+        </option>
+      </select>
+    </div>
+
+    <!-- MCP Tool Manager -->
+    <div class="sidebar-section sidebar-scroll p-3">
+      <p class="section-title mb-2">
+        <i class="bi bi-tools text-primary me-2"></i>Tools
+        <span *ngIf="activeToolCount > 0" class="badge bg-primary ms-1 fw-normal">{{ activeToolCount }}</span>
+      </p>
+
+      <div *ngIf="mcpConnections.length === 0" class="text-muted small text-center py-2">
+        <i class="bi bi-plug d-block mb-1 fs-5 opacity-50"></i>
+        No MCP servers connected.<br>
+        Go to <strong>MCP Config</strong> tab.
+      </div>
+
+      <div *ngFor="let conn of mcpConnections" class="server-block border rounded mb-2">
+        <!-- Server toggle row -->
+        <div class="server-header d-flex align-items-center px-2 py-1 bg-light rounded-top">
+          <div class="form-check form-switch mb-0 me-2">
+            <input class="form-check-input"
+                   type="checkbox"
+                   role="switch"
+                   [checked]="conn.enabled"
+                   (change)="toggleServer(conn)">
+          </div>
+          <i class="bi bi-hdd-stack text-primary small me-1"></i>
+          <span class="small fw-semibold text-truncate flex-1" [title]="conn.label">{{ conn.label }}</span>
+          <span class="badge bg-secondary small ms-1">{{ conn.tools.length }}</span>
+        </div>
+
+        <!-- Tools list -->
+        <div *ngIf="conn.enabled" class="tools-list px-2 py-1">
+          <div *ngFor="let tool of conn.tools"
+               class="form-check py-0 mb-0">
+            <input class="form-check-input"
+                   type="checkbox"
+                   [id]="conn.connectionId + '-' + tool.name"
+                   [(ngModel)]="tool.enabled">
+            <label class="form-check-label small text-muted text-truncate d-block"
+                   [for]="conn.connectionId + '-' + tool.name"
+                   [title]="tool.description || tool.name">
+              {{ tool.name }}
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar footer: Clear Chat -->
+    <div class="sidebar-footer border-top p-3">
+      <button class="btn btn-sm btn-outline-secondary w-100"
+              (click)="clearChat()"
+              [disabled]="messages.length === 0">
+        <i class="bi bi-trash3 me-1"></i>Clear Chat
+      </button>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ── Chat Main Area ────────────────────────────────────────────────────── -->
+  <div class="chat-main">
+
+    <!-- Chat Header -->
+    <div class="chat-header border-bottom px-4 py-2 d-flex align-items-center gap-2 flex-shrink-0">
+      <i class="bi bi-chat-dots-fill text-primary"></i>
+      <span class="fw-semibold">Chat</span>
+
+      <ng-container *ngIf="getSelectedProvider() as sel">
+        <span class="badge bg-primary">
+          <i class="bi me-1" [ngClass]="providerIconClass(sel.provider)"></i>
+          {{ sel.provider | titlecase }} — {{ sel.model }}
+        </span>
+      </ng-container>
+
+      <span *ngIf="activeToolCount > 0" class="badge bg-success">
+        <i class="bi bi-tools me-1"></i>{{ activeToolCount }} tool{{ activeToolCount === 1 ? '' : 's' }} active
+      </span>
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-body" #chatBody>
+
+      <!-- Empty state -->
+      <div *ngIf="messages.length === 0 && !isThinking" class="empty-state">
+        <i class="bi bi-chat-square-dots d-block fs-1 mb-3 text-primary opacity-35"></i>
+        <p class="fw-semibold mb-1">Start a conversation</p>
+        <p class="small mb-0 text-muted">Select a model on the left, then type a message below.</p>
+      </div>
+
+      <!-- Chat messages -->
+      <ng-container *ngFor="let msg of messages">
+
+        <!-- User bubble -->
+        <div *ngIf="msg.role === 'user'" class="msg-row msg-row-user">
+          <div class="msg-bubble msg-user">{{ msg.content }}</div>
+          <span class="msg-time">{{ msg.timestamp | date:'HH:mm' }}</span>
+        </div>
+
+        <!-- AI bubble -->
+        <div *ngIf="msg.role === 'assistant'" class="msg-row msg-row-ai">
+          <div class="ai-avatar flex-shrink-0">
+            <i class="bi bi-robot"></i>
+          </div>
+          <div class="d-flex flex-column align-items-start gap-1">
+            <div class="msg-bubble msg-ai">{{ msg.content }}</div>
+            <div *ngIf="msg.toolsUsed && msg.toolsUsed.length > 0" class="d-flex align-items-center flex-wrap gap-1">
+              <i class="bi bi-tools text-muted" style="font-size: 0.7rem;"></i>
+              <span *ngFor="let t of msg.toolsUsed"
+                    class="badge bg-light text-muted border"
+                    style="font-size: 0.65rem;">{{ t }}</span>
+            </div>
+            <span class="msg-time">{{ msg.timestamp | date:'HH:mm' }}</span>
+          </div>
+        </div>
+
+      </ng-container>
+
+      <!-- Thinking indicator -->
+      <div *ngIf="isThinking" class="msg-row msg-row-ai">
+        <div class="ai-avatar flex-shrink-0">
+          <i class="bi bi-robot"></i>
+        </div>
+        <div class="msg-bubble msg-ai d-flex align-items-center gap-2">
+          <div class="thinking-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span class="small text-muted">Thinking...</span>
+        </div>
+      </div>
+
+    </div><!-- /chat-body -->
+
+    <!-- Input Area -->
+    <div class="chat-input-area border-top px-4 py-3 flex-shrink-0">
+
+      <!-- Floating error toast (does not affect layout) -->
+      <div *ngIf="showError" class="chat-error-toast">
+        <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
+        <span class="flex-1" style="height: 100%;">{{ errorMessage }}</span>
+        <button class="btn-close btn-close-sm ms-2" style="width: 100px;" (click)="dismissError()"></button>
+      </div>
+
+      <div class="input-group">
+        <textarea class="form-control"
+                  rows="2"
+                  placeholder="Type your message… (Enter to send, Shift+Enter for new line)"
+                  [(ngModel)]="inputMessage"
+                  (keydown)="onEnter($event)"
+                  [disabled]="isThinking"
+                  style="resize: none;"></textarea>
+        <button class="btn btn-primary px-4"
+                (click)="sendMessage()"
+                [disabled]="!inputMessage.trim() || isThinking">
+          <span *ngIf="isThinking"
+                class="spinner-border spinner-border-sm"
+                role="status"></span>
+          <i *ngIf="!isThinking" class="bi bi-send-fill"></i>
+        </button>
+      </div>
+
+    </div><!-- /input-area -->
+
+  </div><!-- /chat-main -->
+
+</div><!-- /chat-wrapper -->

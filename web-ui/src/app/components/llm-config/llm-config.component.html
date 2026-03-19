@@ -1,0 +1,182 @@
+<div class="row g-3">
+
+  <!-- ── Left: Verify Form ─────────────────────────────────────────────────── -->
+  <div class="col-xl-4 col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-primary text-white fw-semibold">
+        <i class="bi bi-cpu-fill me-2"></i>Add LLM Provider
+      </div>
+      <div class="card-body px-4 py-2" [formGroup]="llmForm">
+
+        <!-- Provider -->
+        <div class="mb-2">
+          <label class="form-label fw-semibold small mb-1">Provider</label>
+          <select class="form-select"
+                  formControlName="provider"
+                  (change)="onProviderChange()"
+                  [class.is-invalid]="llmForm.get('provider')!.invalid && llmForm.get('provider')!.touched">
+            <option value="" disabled>Select a provider...</option>
+            <option value="gemini">Gemini (Google)</option>
+            <option value="openai">OpenAI</option>
+            <option value="claude">Claude (Anthropic)</option>
+          </select>
+          <div class="invalid-feedback">Please select a provider.</div>
+        </div>
+
+        <!-- Model -->
+        <div class="mb-2">
+          <label class="form-label fw-semibold small mb-1">Model</label>
+          <select class="form-select"
+                  formControlName="model"
+                  [class.is-invalid]="llmForm.get('model')!.invalid && llmForm.get('model')!.touched">
+            <option value="" disabled>
+              {{ llmForm.get('provider')!.value ? 'Select a model...' : 'Select a provider first' }}
+            </option>
+            <option *ngFor="let opt of modelOptions" [value]="opt.value">{{ opt.label }}</option>
+          </select>
+          <div class="invalid-feedback">Please select a model.</div>
+        </div>
+
+        <!-- Custom Model -->
+        <div class="mb-3" *ngIf="isCustomModel">
+          <label class="form-label fw-semibold small mb-1">Custom Model ID</label>
+          <input type="text"
+                 class="form-control font-monospace"
+                 formControlName="customModel"
+                 placeholder="e.g. gemini-2.0-flash"
+                 [class.is-invalid]="llmForm.get('customModel')!.invalid && llmForm.get('customModel')!.touched">
+          <div class="invalid-feedback">Please enter a custom model ID.</div>
+        </div>
+
+        <!-- API Key -->
+        <div class="mb-4">
+          <label class="form-label fw-semibold small mb-1">API Key</label>
+          <input type="password"
+                 class="form-control font-monospace"
+                 formControlName="apiKey"
+                 placeholder="••••••••••••••••••••••••••••••••"
+                 autocomplete="current-password"
+                 [class.is-invalid]="llmForm.get('apiKey')!.invalid && llmForm.get('apiKey')!.touched">
+          <div class="invalid-feedback">API key is required.</div>
+        </div>
+
+        <!-- Verify & Save Button -->
+        <button class="btn btn-primary w-100"
+                (click)="verifyLlm()"
+                [disabled]="verifyStatus === 'verifying'">
+          <span *ngIf="verifyStatus === 'verifying'"
+                class="spinner-border spinner-border-sm me-2"
+                role="status"></span>
+          <i *ngIf="verifyStatus !== 'verifying'" class="bi bi-shield-check me-2"></i>
+          {{ verifyStatus === 'verifying' ? 'Verifying...' : 'Verify & Save' }}
+        </button>
+
+        <!-- Inline status -->
+        <div *ngIf="verifyStatus === 'success'" class="d-flex align-items-center gap-2 mt-3">
+          <span class="status-dot status-success"></span>
+          <span class="small text-success fw-semibold">Added to registry</span>
+          <span *ngIf="verifyLatency !== null"
+                class="badge bg-success-subtle text-success border border-success-subtle">
+            {{ verifyLatency }}ms
+          </span>
+        </div>
+
+        <div *ngIf="verifyStatus === 'error'"
+             class="alert alert-danger mt-3 mb-0 py-2 small">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="status-dot status-error"></span>
+            <span class="fw-semibold">Verification Failed</span>
+            <span *ngIf="verifyLatency !== null"
+                  class="badge bg-danger-subtle text-danger border border-danger-subtle ms-auto">
+              {{ verifyLatency }}ms
+            </span>
+          </div>
+          <i class="bi bi-exclamation-circle me-1"></i>{{ verifyError }}
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: Registry Table ──────────────────────────────────────────────── -->
+  <div class="col-xl-8 col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <i class="bi bi-hdd-stack me-2 text-primary"></i>
+        Connected Providers
+        <span class="badge bg-primary ms-2">{{ registeredProviders.length }}</span>
+      </div>
+
+      <!-- Empty state -->
+      <div *ngIf="registeredProviders.length === 0"
+           class="card-body text-center text-muted py-5">
+        <i class="bi bi-cloud-slash d-block fs-1 mb-3 opacity-35 text-primary"></i>
+        <p class="mb-1 fw-semibold">No providers connected yet</p>
+        <p class="small mb-0">Use the form to verify and add a provider to the registry.</p>
+      </div>
+
+      <!-- Table -->
+      <div *ngIf="registeredProviders.length > 0" class="table-responsive">
+        <table class="table table-hover align-middle mb-0 registry-table">
+          <thead class="table-light">
+            <tr>
+              <th>Provider</th>
+              <th>Model</th>
+              <th class="text-end" style="width:90px">Latency</th>
+              <th style="width:100px">Added</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let entry of registeredProviders">
+              <!-- Provider -->
+              <td>
+                <span class="d-flex align-items-center gap-2">
+                  <i class="bi text-primary" [ngClass]="providerIconClass(entry.provider)"></i>
+                  <span class="fw-semibold">{{ providerLabel(entry.provider) }}</span>
+                </span>
+              </td>
+              <!-- Model -->
+              <td>
+                <span class="font-monospace small text-muted">{{ entry.model }}</span>
+              </td>
+              <!-- Latency -->
+              <td class="text-end">
+                <span class="badge"
+                      [class.bg-success-subtle]="entry.latency < 2000"
+                      [class.text-success]="entry.latency < 2000"
+                      [class.border-success-subtle]="entry.latency < 2000"
+                      [class.bg-warning-subtle]="entry.latency >= 2000"
+                      [class.text-warning]="entry.latency >= 2000"
+                      [class.border-warning-subtle]="entry.latency >= 2000"
+                      style="border: 1px solid;">
+                  {{ entry.latency }}ms
+                </span>
+              </td>
+              <!-- Time -->
+              <td>
+                <span class="small text-muted">{{ formatTime(entry.verifiedAt) }}</span>
+              </td>
+              <!-- Delete -->
+              <td>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2"
+                        title="Remove from registry"
+                        (click)="deleteEntry(entry.id)">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Phase 3 hint -->
+      <div *ngIf="registeredProviders.length > 0"
+           class="card-footer bg-white text-muted small py-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Verified providers are available for selection in the <strong>Chat</strong> module.
+      </div>
+    </div>
+  </div>
+
+</div>

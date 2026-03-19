@@ -1,0 +1,30 @@
+// ── Status dots ────────────────────────────────────────────────────────────
+.status-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &.status-success { background-color: #198754; }
+  &.status-error   { background-color: #dc3545; }
+}
+
+// ── Registry table ─────────────────────────────────────────────────────────
+.registry-table {
+  font-size: 0.875rem;
+
+  thead th {
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    border-bottom-width: 1px;
+  }
+
+  tbody tr.table-primary {
+    --bs-table-bg: rgba(13, 110, 253, 0.06);
+    --bs-table-border-color: rgba(13, 110, 253, 0.15);
+  }
+}

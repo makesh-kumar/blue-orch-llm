@@ -1,0 +1,54 @@
+<!-- Navbar -->
+<div class="page-wrapper">
+<nav class="navbar navbar-dark bg-primary shadow-sm flex-shrink-0">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand fw-bold fs-5">
+      <i class="bi bi-diagram-3-fill me-2"></i>BlueOrch — Orchestrator
+    </span>
+  </div>
+</nav>
+
+<div class="page-content container-fluid d-flex flex-column py-3 px-4">
+
+  <!-- Tab Nav -->
+  <ul class="nav nav-tabs flex-shrink-0 mb-3">
+    <li class="nav-item">
+      <button class="nav-link d-flex align-items-center gap-2"
+              [class.active]="activeTab === 'mcp'"
+              (click)="setTab('mcp')">
+        <i class="bi bi-diagram-3-fill"></i>MCP Config
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-flex align-items-center gap-2"
+              [class.active]="activeTab === 'llm'"
+              (click)="setTab('llm')">
+        <i class="bi bi-cpu-fill"></i>LLM Config
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-flex align-items-center gap-2"
+              [class.active]="activeTab === 'chat'"
+              (click)="setTab('chat')">
+        <i class="bi bi-chat-dots-fill"></i>Chat
+      </button>
+    </li>
+  </ul>
+
+  <!-- MCP Tab -->
+  <div class="tab-fill" [class.d-none]="activeTab !== 'mcp'">
+    <app-mcp-config></app-mcp-config>
+  </div>
+
+  <!-- LLM Tab -->
+  <div class="llm-tab-content" [class.d-none]="activeTab !== 'llm'">
+    <app-llm-config></app-llm-config>
+  </div>
+
+  <!-- Chat Tab -->
+  <div class="tab-fill" [class.d-none]="activeTab !== 'chat'">
+    <app-chat></app-chat>
+  </div>
+
+</div>
+</div>

@@ -51,7 +51,7 @@ export interface LogsResponse {
 
 @Injectable({ providedIn: 'root' })
 export class McpService {
-  private readonly apiUrl = 'http://localhost:3000/api';
+  private readonly apiUrl = 'http://localhost:3000/api/mcp';
 
   constructor(private http: HttpClient) {
     console.log(`[INIT] ${new Date().toISOString()} McpService initialized | apiUrl: ${this.apiUrl}`);
@@ -62,6 +62,13 @@ export class McpService {
     return this.http
       .post<ConnectResponse>(`${this.apiUrl}/connect`, { command, args })
       .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} McpService.connect() | id: ${res.connectionId}`)));
+  }
+
+  getClients(): Observable<ActiveConnection[]> {
+    console.log(`[INIT] ${new Date().toISOString()} McpService.getClients()`);
+    return this.http
+      .get<ActiveConnection[]>(`${this.apiUrl}/clients`)
+      .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} McpService.getClients() | ${res.length} client(s)`)));
   }
 
   getTools(connectionId: string): Observable<ToolsResponse> {

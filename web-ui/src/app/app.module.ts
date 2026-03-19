@@ -1,20 +1,27 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 import { AppComponent } from './app.component';
-import { McpDashboardComponent } from './components/mcp-dashboard/mcp-dashboard.component';
+import { DashboardComponent } from './components/dashboard/dashboard.component';
+import { McpConfigComponent } from './components/mcp-config/mcp-config.component';
+import { LlmConfigComponent } from './components/llm-config/llm-config.component';
+import { ChatComponent } from './components/chat/chat.component';
 
 @NgModule({
   declarations: [
     AppComponent,
-    McpDashboardComponent,
+    DashboardComponent,
+    McpConfigComponent,
+    LlmConfigComponent,
+    ChatComponent,
   ],
   imports: [
     BrowserModule,
     HttpClientModule,
     FormsModule,
+    ReactiveFormsModule,
   ],
   providers: [],
   bootstrap: [AppComponent],

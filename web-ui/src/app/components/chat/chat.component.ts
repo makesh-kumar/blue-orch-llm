@@ -1,0 +1,252 @@
+import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { ChatService, ChatMessage, ActiveTool } from '../../services/chat.service';
+import { LlmService, LlmRegistryEntry } from '../../services/llm.service';
+import { McpService } from '../../services/mcp.service';
+
+// ─── Local view model ────────────────────────────────────────────────────────
+
+interface McpConnectionView {
+  connectionId: string;
+  label: string;
+  enabled: boolean;
+  tools: { name: string; description: string; enabled: boolean }[];
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+@Component({
+  selector: 'app-chat',
+  templateUrl: './chat.component.html',
+  styleUrls: ['./chat.component.scss'],
+})
+export class ChatComponent implements OnInit, AfterViewChecked {
+  @ViewChild('chatBody') chatBodyRef!: ElementRef<HTMLDivElement>;
+
+  // ── Sidebar
+  providers: LlmRegistryEntry[] = [];
+  selectedProviderId = '';
+  mcpConnections: McpConnectionView[] = [];
+
+  // ── Chat
+  messages: ChatMessage[] = [];
+  inputMessage = '';
+  isThinking = false;
+  errorMessage = '';
+  showError = false;
+
+  private shouldScroll = false;
+
+  constructor(
+    private chatService: ChatService,
+    private llmService: LlmService,
+    private mcpService: McpService,
+  ) {
+    console.log(`[INIT] ${new Date().toISOString()} ChatComponent initialized`);
+  }
+
+  ngOnInit(): void {
+    this.loadSidebar();
+    this.loadHistory();
+  }
+
+  ngAfterViewChecked(): void {
+    if (this.shouldScroll) {
+      this.scrollToBottom();
+      this.shouldScroll = false;
+    }
+  }
+
+  // ── Sidebar data ──────────────────────────────────────────────────────────────
+
+  /** Called once on init and again each time the Chat tab is activated. */
+  loadSidebar(): void {
+    console.log(`[INIT] ${new Date().toISOString()} ChatComponent.loadSidebar()`);
+    this.loadProviders();
+    this.loadMcpConnections();
+  }
+
+  private loadProviders(): void {
+    const currentId = this.selectedProviderId;
+    this.llmService.getRegistry().subscribe({
+      next: (res) => {
+        this.providers = res.registry;
+        // Preserve current selection if it's still in the registry
+        const stillValid = res.registry.some(p => p.id === currentId);
+        if (!stillValid) {
+          this.selectedProviderId = res.activeId ?? (res.registry[0]?.id ?? '');
+        }
+        console.log(`[SUCCESS] ${new Date().toISOString()} Providers loaded | ${res.registry.length}`);
+      },
+      error: err => console.log(`[ERROR] ${new Date().toISOString()} Failed to load providers | ${err.message}`),
+    });
+  }
+
+  private loadMcpConnections(): void {
+    this.mcpService.getClients().subscribe({
+      next: (connections) => {
+        if (connections.length === 0) { this.mcpConnections = []; return; }
+
+        const toolFetches = connections.map(c =>
+          this.mcpService.getTools(c.connectionId).pipe(
+            catchError(() => of({ connectionId: c.connectionId, tools: [] }))
+          )
+        );
+
+        forkJoin(toolFetches).subscribe({
+          next: (toolResponses) => {
+            this.mcpConnections = connections.map((c, i) => {
+              // Preserve user's toggle state for connections already in the list
+              const existing = this.mcpConnections.find(m => m.connectionId === c.connectionId);
+              return {
+                connectionId: c.connectionId,
+                label: c.label,
+                enabled: existing?.enabled ?? true,
+                tools: (toolResponses[i].tools ?? []).map(t => {
+                  const existingTool = existing?.tools.find(et => et.name === t.name);
+                  return {
+                    name: t.name,
+                    description: t.description,
+                    enabled: existingTool?.enabled ?? true,
+                  };
+                }),
+              };
+            });
+            console.log(`[SUCCESS] ${new Date().toISOString()} MCP connections loaded | ${connections.length}`);
+          },
+          error: err => console.log(`[ERROR] ${new Date().toISOString()} Failed to load MCP tools | ${err.message}`),
+        });
+      },
+      error: err => console.log(`[ERROR] ${new Date().toISOString()} Failed to load MCP connections | ${err.message}`),
+    });
+  }
+
+  // ── Sidebar helpers ───────────────────────────────────────────────────────────
+
+  providerLabel(entry: LlmRegistryEntry): string {
+    const names: Record<string, string> = { gemini: 'Gemini', openai: 'OpenAI', claude: 'Claude' };
+    return `${names[entry.provider] ?? entry.provider} — ${entry.model}`;
+  }
+
+  providerIconClass(provider: string): string {
+    const icons: Record<string, string> = { gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu' };
+    return icons[provider] ?? 'bi-box';
+  }
+
+  getSelectedProvider(): LlmRegistryEntry | undefined {
+    return this.providers.find(p => p.id === this.selectedProviderId);
+  }
+
+  toggleServer(conn: McpConnectionView): void {
+    conn.enabled = !conn.enabled;
+    conn.tools.forEach(t => (t.enabled = conn.enabled));
+  }
+
+  getActiveTools(): ActiveTool[] {
+    const tools: ActiveTool[] = [];
+    for (const conn of this.mcpConnections) {
+      if (!conn.enabled) continue;
+      for (const tool of conn.tools) {
+        if (tool.enabled) tools.push({ connectionId: conn.connectionId, toolName: tool.name });
+      }
+    }
+    return tools;
+  }
+
+  get activeToolCount(): number {
+    return this.getActiveTools().length;
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────────────────────
+
+  loadHistory(): void {
+    this.chatService.getHistory().subscribe({
+      next: (res) => {
+        this.messages = res.history.map(h => ({
+          role: h.role as 'user' | 'assistant',
+          content: h.content,
+          timestamp: new Date().toISOString(),
+        }));
+        if (this.messages.length > 0) this.shouldScroll = true;
+        console.log(`[SUCCESS] ${new Date().toISOString()} Chat history loaded | ${this.messages.length} messages`);
+      },
+      error: err => console.log(`[ERROR] ${new Date().toISOString()} Failed to load history | ${err.message}`),
+    });
+  }
+
+  sendMessage(): void {
+    const text = this.inputMessage.trim();
+    if (!text || this.isThinking) return;
+
+    if (!this.selectedProviderId) {
+      this.showAlert('Please select a model before sending a message.');
+      return;
+    }
+
+    this.messages.push({ role: 'user', content: text, timestamp: new Date().toISOString() });
+    this.inputMessage = '';
+    this.isThinking = true;
+    this.showError = false;
+    this.shouldScroll = true;
+
+    console.log(`[INIT] ${new Date().toISOString()} ChatComponent.sendMessage() | provider: ${this.selectedProviderId}`);
+
+    this.chatService.send({
+      message: text,
+      providerId: this.selectedProviderId,
+      activeTools: this.getActiveTools(),
+    }).subscribe({
+      next: (res) => {
+        this.messages.push({
+          role: 'assistant',
+          content: res.reply,
+          toolsUsed: res.toolsUsed,
+          timestamp: new Date().toISOString(),
+        });
+        this.isThinking = false;
+        this.shouldScroll = true;
+        console.log(`[SUCCESS] ${new Date().toISOString()} Reply received | toolsUsed: [${res.toolsUsed.join(', ')}]`);
+      },
+      error: (err) => {
+        this.isThinking = false;
+        const msg = err.error?.error ?? err.message ?? 'An unexpected error occurred.';
+        this.showAlert(`Chat error: ${msg}`);
+        console.log(`[ERROR] ${new Date().toISOString()} sendMessage failed | ${msg}`);
+      },
+    });
+  }
+
+  onEnter(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendMessage();
+    }
+  }
+
+  clearChat(): void {
+    this.chatService.clearHistory().subscribe({
+      next: () => {
+        this.messages = [];
+        console.log(`[SUCCESS] ${new Date().toISOString()} Chat history cleared`);
+      },
+      error: err => console.log(`[ERROR] ${new Date().toISOString()} Failed to clear history | ${err.message}`),
+    });
+  }
+
+  showAlert(msg: string): void {
+    this.errorMessage = msg;
+    this.showError = true;
+  }
+
+  dismissError(): void {
+    this.showError = false;
+  }
+
+  private scrollToBottom(): void {
+    try {
+      const el = this.chatBodyRef?.nativeElement;
+      if (el) el.scrollTop = el.scrollHeight;
+    } catch (_) {}
+  }
+}

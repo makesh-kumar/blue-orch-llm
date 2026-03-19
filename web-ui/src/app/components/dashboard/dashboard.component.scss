@@ -1,0 +1,29 @@
+// ── Full-viewport page layout ────────────────────────────────────────────────
+.page-wrapper {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-content {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+// ── Tab fill: grows to fill remaining height, hands full height to McpConfig
+.tab-fill {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+// ── LLM tab: scrollable, not height-constrained
+.llm-tab-content {
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
