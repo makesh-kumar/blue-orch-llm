@@ -23,6 +23,7 @@ export class McpConfigComponent implements OnInit, OnDestroy {
 
   // ── Logs state
   serverLogs: string[] = [];
+  logsPaused = false;
 
   // ── UI state
   isConnecting = false;
@@ -57,6 +58,7 @@ export class McpConfigComponent implements OnInit, OnDestroy {
   private startLogsPolling(connectionId: string): void {
     this.stopLogsPolling();
     this.logsInterval = setInterval(() => {
+      if (this.logsPaused) return;
       this.mcpService.getLogs(connectionId).subscribe({
         next: (res: LogsResponse) => {
           this.serverLogs = res.logs;
@@ -83,6 +85,11 @@ export class McpConfigComponent implements OnInit, OnDestroy {
       next: () => { this.serverLogs = []; },
       error: () => {},
     });
+  }
+
+  toggleLogsPaused(): void {
+    this.logsPaused = !this.logsPaused;
+    console.log(`[INIT] ${new Date().toISOString()} Log polling ${ this.logsPaused ? 'paused' : 'resumed'}`);
   }
 
   // ── Connect ──────────────────────────────────────────────────────────────
@@ -119,6 +126,7 @@ export class McpConfigComponent implements OnInit, OnDestroy {
     this.toolResult = '';
     this.toolArgsJson = '{}';
     this.serverLogs = [];
+    this.logsPaused = false;
     this.dismissError();
 
     this.mcpService.getTools(id).subscribe({

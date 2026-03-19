@@ -4,6 +4,7 @@ import { catchError } from 'rxjs/operators';
 import { ChatService, ChatMessage, ActiveTool } from '../../services/chat.service';
 import { LlmService, LlmRegistryEntry } from '../../services/llm.service';
 import { McpService } from '../../services/mcp.service';
+import { WorkspaceService } from '../../services/workspace.service';
 
 // ─── Local view model ────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     private chatService: ChatService,
     private llmService: LlmService,
     private mcpService: McpService,
+    private workspaceService: WorkspaceService,
   ) {
     console.log(`[INIT] ${new Date().toISOString()} ChatComponent initialized`);
   }
@@ -196,6 +198,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       message: text,
       providerId: this.selectedProviderId,
       activeTools: this.getActiveTools(),
+      systemContext: this.workspaceService.systemContext,
     }).subscribe({
       next: (res) => {
         this.messages.push({

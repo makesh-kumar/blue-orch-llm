@@ -3,6 +3,7 @@ import cors from 'cors';
 import llmRouter from './llm.routes.js';
 import mcpRouter from './mcp.routes.js';
 import chatRouter from './chat.routes.js';
+import systemRouter from './system.routes.js';
 
 const app = express();
 const PORT = 3000;
@@ -17,9 +18,10 @@ app.use(express.json());
 app.use('/api/llm', llmRouter);
 app.use('/api/mcp', mcpRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/system', systemRouter);
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[INIT] ${ts()} BlueOrch backend ready on port ${PORT}`);
-  console.log(`[INIT] ${ts()} Routes: /api/mcp/* | /api/llm/* | /api/chat/*`);
+  console.log(`[INIT] ${ts()} Routes: /api/mcp/* | /api/llm/* | /api/chat/* | /api/system/*`);
 });

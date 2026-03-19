@@ -98,6 +98,11 @@
   background-color: #3fb950;
   display: inline-block;
   animation: pulse 1.5s ease-in-out infinite;
+
+  &.paused {
+    background-color: #ffc107;
+    animation: none;
+  }
 }
 
 @keyframes pulse {

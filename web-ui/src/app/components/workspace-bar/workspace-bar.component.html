@@ -1,0 +1,109 @@
+<!-- ── Workspace Bar ──────────────────────────────────────────────────────── -->
+<div class="workspace-bar d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+
+  <i class="bi bi-folder2-open text-primary flex-shrink-0"></i>
+  <span class="workspace-label text-muted small fw-semibold flex-shrink-0">Workspace</span>
+
+  <input
+    class="form-control form-control-sm workspace-input font-monospace"
+    type="text"
+    [value]="pathInput"
+    (input)="pathInput = $any($event.target).value"
+    (keydown)="onPathKeydown($event)"
+    (blur)="applyPathInput()"
+    title="Active workspace path (press Enter to apply)"
+    spellcheck="false">
+
+  <button
+    class="btn btn-sm btn-outline-primary flex-shrink-0"
+    (click)="openBrowser()"
+    title="Browse file system">
+    <i class="bi bi-folder-symlink me-1"></i>Browse
+  </button>
+
+</div>
+
+<!-- ── File Browser Overlay ───────────────────────────────────────────────── -->
+<div *ngIf="showBrowser" class="browser-backdrop" (click)="closeBrowser()"></div>
+
+<div *ngIf="showBrowser" class="browser-panel shadow-lg">
+
+  <!-- Header -->
+  <div class="browser-header d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-primary text-white">
+    <i class="bi bi-folder2-open me-1"></i>
+    <span class="fw-semibold small flex-1 text-truncate">{{ browserPath || '/' }}</span>
+    <button class="btn btn-sm btn-close btn-close-white" (click)="closeBrowser()"></button>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="browser-toolbar d-flex align-items-center gap-2 px-3 py-1 border-bottom bg-light small">
+    <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+            (click)="navigateUp()"
+            [disabled]="browserPath === '/' || !browserPath"
+            title="Go up one level">
+      <i class="bi bi-arrow-up"></i>
+    </button>
+
+    <span class="font-monospace text-muted text-truncate flex-1" style="font-size:0.75rem;">
+      {{ browserPath || '/' }}
+    </span>
+
+    <button class="btn btn-sm btn-primary py-0 px-2"
+            (click)="selectCurrentDir()"
+            title="Set as active workspace">
+      <i class="bi bi-check-lg me-1"></i>Select
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="browserLoading" class="text-center py-5 text-muted">
+    <div class="spinner-border spinner-border-sm mb-2" role="status"></div>
+    <p class="small mb-0">Loading…</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="!browserLoading && browserError"
+       class="alert alert-warning m-3 py-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ browserError }}
+  </div>
+
+  <!-- File tree -->
+  <div *ngIf="!browserLoading && !browserError" class="browser-list">
+
+    <div *ngIf="browserItems.length === 0" class="text-center text-muted py-4 small">
+      <i class="bi bi-folder-x d-block fs-4 mb-2 opacity-50"></i>
+      Empty folder
+    </div>
+
+    <div *ngFor="let item of browserItems"
+         class="browser-item d-flex align-items-center gap-2 px-3 py-1"
+         [class.is-dir]="item.type === 'directory'"
+         (click)="item.type === 'directory' ? navigateInto(item) : null"
+         [title]="item.path">
+
+      <i class="bi flex-shrink-0"
+         [class.bi-folder-fill]="item.type === 'directory'"
+         [class.text-warning]="item.type === 'directory'"
+         [class.bi-file-text]="item.type === 'file'"
+         [class.text-muted]="item.type === 'file'"></i>
+
+      <span class="small text-truncate flex-1">{{ item.name }}</span>
+
+      <button *ngIf="item.type === 'directory'"
+              class="btn btn-xs btn-outline-primary py-0 px-1 flex-shrink-0 small"
+              (click)="$event.stopPropagation(); workspaceService.setPath(item.path); closeBrowser()"
+              title="Set as workspace">
+        <i class="bi bi-pin-angle"></i>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="browser-footer border-top px-3 py-2 bg-light d-flex align-items-center justify-content-between small text-muted">
+    <span>{{ browserItems.length }} item(s)</span>
+    <button class="btn btn-sm btn-secondary py-0"
+            (click)="closeBrowser()">Cancel</button>
+  </div>
+
+</div>

@@ -8,6 +8,7 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { McpConfigComponent } from './components/mcp-config/mcp-config.component';
 import { LlmConfigComponent } from './components/llm-config/llm-config.component';
 import { ChatComponent } from './components/chat/chat.component';
+import { WorkspaceBarComponent } from './components/workspace-bar/workspace-bar.component';
 
 @NgModule({
   declarations: [
@@ -16,6 +17,7 @@ import { ChatComponent } from './components/chat/chat.component';
     McpConfigComponent,
     LlmConfigComponent,
     ChatComponent,
+    WorkspaceBarComponent,
   ],
   imports: [
     BrowserModule,

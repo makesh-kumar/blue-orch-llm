@@ -48,7 +48,7 @@ function extractToolText(result) {
 
 // ─── Provider handlers ─────────────────────────────────────────────────────────
 
-async function handleGemini({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed }) {
+async function handleGemini({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
   const { GoogleGenerativeAI } = await import('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -60,6 +60,7 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
 
   const genModel = genAI.getGenerativeModel({
     model,
+    ...(systemContext && { systemInstruction: systemContext }),
     ...(functionDeclarations.length > 0 && { tools: [{ functionDeclarations }] }),
   });
 
@@ -102,7 +103,7 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleOpenAI({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed }) {
+async function handleOpenAI({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
   const OpenAI = (await import('openai')).default;
   const openai = new OpenAI({ apiKey });
 
@@ -116,6 +117,7 @@ async function handleOpenAI({ apiKey, model, message, history, toolDefs, execute
   }));
 
   const messages = [
+    ...(systemContext ? [{ role: 'system', content: systemContext }] : []),
     ...history.map(h => ({ role: h.role, content: h.content })),
     { role: 'user', content: message },
   ];
@@ -157,7 +159,7 @@ async function handleOpenAI({ apiKey, model, message, history, toolDefs, execute
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleClaude({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed }) {
+async function handleClaude({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
   const Anthropic = (await import('@anthropic-ai/sdk')).default;
   const client = new Anthropic({ apiKey });
 
@@ -175,6 +177,7 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
   let response = await client.messages.create({
     model,
     max_tokens: 4096,
+    ...(systemContext && { system: systemContext }),
     ...(tools.length > 0 && { tools }),
     messages,
   });
@@ -212,7 +215,7 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleOllama({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed }) {
+async function handleOllama({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
   const OpenAI = (await import('openai')).default;
   const openai = new OpenAI({
     baseURL: `${baseUrl ?? 'http://localhost:11434'}/v1`,
@@ -229,6 +232,7 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
   }));
 
   const messages = [
+    ...(systemContext ? [{ role: 'system', content: systemContext }] : []),
     ...history.map(h => ({ role: h.role, content: h.content })),
     { role: 'user', content: message },
   ];
@@ -269,9 +273,9 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
 }
 
 // ─── POST /api/chat/send ──────────────────────────────────────────────────────
-// Body: { message, providerId, activeTools: [{ connectionId, toolName }] }
+// Body: { message, providerId, activeTools, systemContext? }
 router.post('/send', async (req, res) => {
-  const { message, providerId, activeTools } = req.body;
+  const { message, providerId, activeTools, systemContext } = req.body;
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: '"message" (string) is required' });
@@ -311,7 +315,7 @@ router.post('/send', async (req, res) => {
   console.log(`[INIT] ${ts()} /chat/send | provider: ${provider} | model: ${model} | tools: ${toolDefs.length} | history: ${chatHistory.length}`);
 
   const toolsUsed = [];
-  const commonArgs = { apiKey, model, message, history: [...chatHistory], toolDefs, executeTool, toolsUsed };
+  const commonArgs = { apiKey, model, message, history: [...chatHistory], toolDefs, executeTool, toolsUsed, systemContext: systemContext ?? '' };
 
   try {
     let reply = '';

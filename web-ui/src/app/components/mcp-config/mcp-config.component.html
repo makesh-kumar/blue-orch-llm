@@ -209,9 +209,17 @@
           Server Logs
           <span class="badge bg-secondary ms-2">{{ serverLogs.length }}</span>
           <div class="ms-auto d-flex align-items-center gap-2">
-            <span class="live-dot"></span>
-            <span class="small text-muted">Live</span>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1"
+            <span class="live-dot" [class.paused]="logsPaused"></span>
+            <span class="small text-muted">{{ logsPaused ? 'Paused' : 'Live' }}</span>
+            <button class="btn btn-sm py-0 px-2 ms-1"
+                    [class.btn-outline-warning]="!logsPaused"
+                    [class.btn-outline-success]="logsPaused"
+                    (click)="toggleLogsPaused()"
+                    [title]="logsPaused ? 'Resume log polling' : 'Pause log polling'">
+              <i class="bi me-1" [class.bi-pause-fill]="!logsPaused" [class.bi-play-fill]="logsPaused"></i>
+              {{ logsPaused ? 'Resume' : 'Pause' }}
+            </button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2"
                     (click)="clearServerLogs()" title="Clear logs">
               <i class="bi bi-trash3 me-1"></i>Clear
             </button>

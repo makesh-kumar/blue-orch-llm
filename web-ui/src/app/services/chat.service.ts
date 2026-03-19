@@ -21,6 +21,7 @@ export interface SendChatRequest {
   message: string;
   providerId: string;
   activeTools: ActiveTool[];
+  systemContext?: string;
 }
 
 export interface SendChatResponse {

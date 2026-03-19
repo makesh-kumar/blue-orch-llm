@@ -1,0 +1,91 @@
+// ── Workspace bar strip ───────────────────────────────────────────────────────
+:host {
+  display: block;
+  position: relative;   // establishes stacking context for the browser panel
+}
+
+.workspace-bar {
+  background-color: #f0f4ff;
+  border-bottom: 1px solid #dee2e6;
+  min-height: 40px;
+}
+
+.workspace-label {
+  white-space: nowrap;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workspace-input {
+  min-width: 0;
+  font-size: 0.8rem;
+
+  &:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.2);
+  }
+}
+
+// ── File browser overlay ──────────────────────────────────────────────────────
+.browser-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1040;
+}
+
+.browser-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(700px, 96vw);
+  height: min(600px, 90vh);
+  background: #fff;
+  border-radius: 0.5rem;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.browser-header {
+  flex-shrink: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.browser-toolbar {
+  flex-shrink: 0;
+}
+
+.browser-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.browser-item {
+  cursor: default;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.1s;
+
+  &.is-dir {
+    cursor: pointer;
+
+    &:hover {
+      background-color: #e8f0fe;
+    }
+  }
+}
+
+.browser-footer {
+  flex-shrink: 0;
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+// Tiny button variant used inside the browser list rows
+.btn-xs {
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
