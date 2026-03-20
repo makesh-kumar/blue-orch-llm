@@ -92,8 +92,9 @@
   <div class="chat-main">
 
     <!-- Chat Header -->
-    <div class="chat-header border-bottom px-4 py-2 d-flex align-items-center gap-2 flex-shrink-0">
-      <i class="bi bi-chat-dots-fill text-primary"></i>
+    <div class="chat-header border-bottom px-4 py-2 d-flex align-items-center gap-5 flex-shrink-0">
+      <div class="d-flex align-items-center gap-1">
+              <i class="bi bi-chat-dots-fill text-primary"></i>
       <span class="fw-semibold">Chat</span>
 
       <ng-container *ngIf="getSelectedProvider() as sel">
@@ -106,10 +107,26 @@
       <span *ngIf="activeToolCount > 0" class="badge bg-success">
         <i class="bi bi-tools me-1"></i>{{ activeToolCount }} tool{{ activeToolCount === 1 ? '' : 's' }} active
       </span>
-    </div>
+      </div>
 
-    <!-- Workspace Bar -->
-    <app-workspace-bar></app-workspace-bar>
+      <!-- Project / Expert Mode segmented selector — right end -->
+      <div class="mode-segment flex-shrink-0" role="group" aria-label="Chat mode">
+        <input type="radio" class="btn-check" name="chatMode" id="modeExpert"
+               [value]="false" [(ngModel)]="isProjectModeActive" autocomplete="off">
+        <label class="btn btn-sm mode-btn mode-btn-expert" for="modeExpert">
+          <i class="bi bi-globe2 me-1"></i>Expert Mode
+        </label>
+
+        <input type="radio" class="btn-check" name="chatMode" id="modeProject"
+               [value]="true" [(ngModel)]="isProjectModeActive" autocomplete="off">
+        <label class="btn btn-sm mode-btn mode-btn-project" for="modeProject">
+          <i class="bi bi-folder2-open me-1"></i>Project Mode
+        </label>
+      </div>
+
+      <!-- Workspace bar — inline, fills available space -->
+      <app-workspace-bar class="header-workspace"></app-workspace-bar>
+    </div>
 
     <!-- Messages -->
     <div class="chat-body" #chatBody>
@@ -165,7 +182,7 @@
     </div><!-- /chat-body -->
 
     <!-- Input Area -->
-    <div class="chat-input-area border-top px-4 py-3 flex-shrink-0">
+    <div class="chat-input-area border-top px-4 py-2 flex-shrink-0">
 
       <!-- Floating error toast (does not affect layout) -->
       <div *ngIf="showError" class="chat-error-toast">
@@ -177,7 +194,7 @@
       <div class="input-group">
         <textarea class="form-control"
                   rows="2"
-                  placeholder="Type your message… (Enter to send, Shift+Enter for new line)"
+                  [placeholder]="inputPlaceholder"
                   [(ngModel)]="inputMessage"
                   (keydown)="onEnter($event)"
                   [disabled]="isThinking"

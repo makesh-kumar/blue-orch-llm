@@ -205,6 +205,57 @@
   }
 }
 
+// ── Project / Expert Mode segmented selector ─────────────────────────────────
+.mode-segment {
+  display: inline-flex;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+  background-color: #f1f3f5;
+
+  .mode-btn {
+    border: none;
+    border-radius: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.85rem;
+    background-color: transparent;
+    color: #adb5bd;
+    transition: background-color 0.18s, color 0.18s;
+
+    &:first-of-type { border-radius: 1rem 0 0 1rem; }
+    &:last-of-type  { border-radius: 0 1rem 1rem 0; }
+  }
+
+  // Expert active — dark grey
+  .btn-check:checked + .mode-btn-expert {
+    background-color: #495057;
+    color: #fff;
+  }
+
+  // Project active — same dark grey
+  .btn-check:checked + .mode-btn-project {
+    background-color: #495057;
+    color: #fff;
+  }
+}
+
+// ── Workspace bar — inline inside chat header ─────────────────────────────
+app-workspace-bar.header-workspace {
+  flex: 1;
+  min-width: 0;
+
+  /* pierce into workspace-bar component view */
+  ::ng-deep .workspace-bar {
+    background: transparent;
+    border-bottom: none;
+    min-height: unset;
+    padding: 0;
+
+    .workspace-label { display: none; } // redundant in header context
+  }
+}
+
 // Floats above the input bar, does not shift any layout
 .chat-error-toast {
     height: 100px;

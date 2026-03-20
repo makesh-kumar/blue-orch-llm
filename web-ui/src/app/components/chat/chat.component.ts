@@ -6,6 +6,17 @@ import { LlmService, LlmRegistryEntry } from '../../services/llm.service';
 import { McpService } from '../../services/mcp.service';
 import { WorkspaceService } from '../../services/workspace.service';
 
+// ─── System Instruction Constants ───────────────────────────────────────────
+
+const SYSTEM_PROJECT_MODE = (workspacePath: string): string =>
+  `You are a Senior Systems Architect. Local Workspace: ${workspacePath}. ` +
+  `Use MCP tools to analyze and modify the codebase.`;
+
+const SYSTEM_EXPERT_MODE =
+  `You are a world-class Senior Software Engineer and Computer Science expert. ` +
+  `Provide high-performance, clean, and secure code solutions focusing on industry best practices ` +
+  `and efficient algorithms. (Note: Local workspace access is currently disabled for this query.)`;
+
 // ─── Local view model ────────────────────────────────────────────────────────
 
 interface McpConnectionView {
@@ -36,6 +47,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   isThinking = false;
   errorMessage = '';
   showError = false;
+
+  // ── Project Mode (off by default — user opts in explicitly)
+  isProjectModeActive = false;
 
   private shouldScroll = false;
 
@@ -160,6 +174,19 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     return this.getActiveTools().length;
   }
 
+  get inputPlaceholder(): string {
+    return this.isProjectModeActive
+      ? 'Ask about your project...'
+      : 'Ask a general coding question...';
+  }
+
+  get systemInstruction(): string {
+    if (this.isProjectModeActive) {
+      return SYSTEM_PROJECT_MODE(this.workspaceService.currentPath);
+    }
+    return SYSTEM_EXPERT_MODE;
+  }
+
   // ── Chat ──────────────────────────────────────────────────────────────────────
 
   loadHistory(): void {
@@ -194,11 +221,13 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
     console.log(`[INIT] ${new Date().toISOString()} ChatComponent.sendMessage() | provider: ${this.selectedProviderId}`);
 
+    const activeTools = this.isProjectModeActive ? this.getActiveTools() : [];
+
     this.chatService.send({
       message: text,
       providerId: this.selectedProviderId,
-      activeTools: this.getActiveTools(),
-      systemContext: this.workspaceService.systemContext,
+      activeTools,
+      systemContext: this.systemInstruction,
     }).subscribe({
       next: (res) => {
         this.messages.push({
