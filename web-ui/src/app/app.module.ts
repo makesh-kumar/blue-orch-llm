@@ -11,6 +11,8 @@ import { McpConfigComponent } from './components/mcp-config/mcp-config.component
 import { LlmConfigComponent } from './components/llm-config/llm-config.component';
 import { ChatComponent } from './components/chat/chat.component';
 import { WorkspaceBarComponent } from './components/workspace-bar/workspace-bar.component';
+import { TokenBadgeComponent } from './components/token-badge/token-badge.component';
+import { UsageBadgeComponent } from './components/usage-badge/usage-badge.component';
 
 // ─── Custom Marked renderer ────────────────────────────────────────────────────────────
 // Must be an exported named function (not lambda) for AOT compatibility.
@@ -74,6 +76,8 @@ export function markedOptionsFactory(): MarkedOptions {
     LlmConfigComponent,
     ChatComponent,
     WorkspaceBarComponent,
+    TokenBadgeComponent,
+    UsageBadgeComponent,
   ],
   imports: [
     BrowserModule,

@@ -47,11 +47,10 @@ router.post('/verify', async (req, res) => {
       }
 
     } else if (provider === 'gemini') {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const genModel = genAI.getGenerativeModel({ model });
-      // countTokens is a lightweight read-only call — no output tokens charged
-      await genModel.countTokens('ping');
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey });
+      // generateContent with a minimal prompt validates key + model without significant cost
+      await ai.models.generateContent({ model, contents: [{ role: 'user', parts: [{ text: 'ping' }] }] });
 
     } else if (provider === 'openai') {
       const OpenAI = (await import('openai')).default;

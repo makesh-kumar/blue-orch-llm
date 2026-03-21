@@ -1,0 +1,55 @@
+<div *ngIf="usage" class="usage-badge d-inline-flex align-items-center gap-2 flex-wrap">
+
+  <!-- Provider Icon -->
+  <span class="badge-provider">
+    <i [class]="providerIconClass"></i>
+  </span>
+
+  <span class="badge-divider">|</span>
+
+  <!-- Cost (non-Ollama) or Speed (Ollama) -->
+  <ng-container *ngIf="!isOllama">
+    <span class="badge-stat badge-cost">
+      <i class="bi bi-currency-dollar me-1 text-primary"></i>
+      <span class="label">Cost:</span>
+      <span class="value fw-semibold">{{ costDisplay }}</span>
+    </span>
+  </ng-container>
+
+  <ng-container *ngIf="isOllama">
+    <span class="badge-stat badge-speed">
+      <i class="bi bi-speedometer2 me-1 text-success"></i>
+      <span class="label">Speed:</span>
+      <span class="value fw-semibold">{{ tpsDisplay }}</span>
+    </span>
+  </ng-container>
+
+  <span class="badge-divider">|</span>
+
+  <!-- Input tokens -->
+  <span class="badge-stat">
+    <i class="bi bi-arrow-up-circle me-1 text-primary"></i>
+    <span class="label">In:</span>
+    <span class="value">{{ inputDisplay }}</span>
+  </span>
+
+  <span class="badge-divider">|</span>
+
+  <!-- Output tokens -->
+  <span class="badge-stat">
+    <i class="bi bi-arrow-down-circle me-1 text-success"></i>
+    <span class="label">Out:</span>
+    <span class="value">{{ outputDisplay }}</span>
+  </span>
+
+  <!-- Cached tokens (only when non-zero) -->
+  <ng-container *ngIf="hasCached">
+    <span class="badge-divider">|</span>
+    <span class="badge-stat">
+      <i class="bi bi-lightning-charge me-1 text-warning"></i>
+      <span class="label">Cached:</span>
+      <span class="value">{{ cachedDisplay }}</span>
+    </span>
+  </ng-container>
+
+</div>

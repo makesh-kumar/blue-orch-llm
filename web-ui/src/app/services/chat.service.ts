@@ -5,11 +5,22 @@ import { tap } from 'rxjs/operators';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
+export interface StandardizedUsage {
+  input: number;
+  output: number;
+  cached: number;
+  model: string;
+  provider: string;
+  latencyMs: number;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   toolsUsed?: string[];
   timestamp: string;
+  standardizedUsage?: StandardizedUsage | null;
+  turnCost?: number;
 }
 
 export interface ActiveTool {
@@ -30,6 +41,7 @@ export interface SendChatRequest {
 export interface SendChatResponse {
   reply: string;
   toolsUsed: string[];
+  standardizedUsage: StandardizedUsage | null;
 }
 
 export interface ChatHistoryResponse {

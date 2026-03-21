@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { connectedLlmRegistry } from './llm.routes.js';
 import { activeClients } from './mcp.routes.js';
 import { getOrCreateCache, truncateIfLarge } from './cache-manager.js';
+import { mapProviderUsage } from './usage-normalizer.js';
 
 const router = Router();
 const ts = () => new Date().toISOString();
@@ -53,70 +54,14 @@ function extractToolText(result) {
 
 // ─── Provider handlers ─────────────────────────────────────────────────────────
 
-async function handleGemini({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
-  const { GoogleGenerativeAI } = await import('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(apiKey);
-
-  const functionDeclarations = toolDefs.map(t => ({
-    name: t.name,
-    description: t.description ?? '',
-    parameters: toGeminiSchema(t.inputSchema),
-  }));
-
-  const genModel = genAI.getGenerativeModel({
-    model,
-    ...(systemContext && { systemInstruction: systemContext }),
-    ...(functionDeclarations.length > 0 && { tools: [{ functionDeclarations }] }),
-  });
-
-  // Gemini uses role 'model' for assistant turns
-  const geminiHistory = history.map(h => ({
-    role: h.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: h.content }],
-  }));
-
-  const chat = genModel.startChat({ history: geminiHistory });
-  let result = await chat.sendMessage(message);
-  let response = result.response;
-
-  // ── Agentic tool loop ────────────────────────────────────────────────────────
-  while (true) {
-    const calls = response.functionCalls?.() ?? [];
-    if (calls.length === 0) break;
-
-    const responseParts = [];
-    for (const fc of calls) {
-      toolsUsed.push(fc.name);
-      console.log(`[INIT] ${ts()} Gemini → tool: ${fc.name} | args: ${JSON.stringify(fc.args)}`);
-      try {
-        const raw = await executeTool(fc.name, fc.args);
-        const output = extractToolText(raw);
-        responseParts.push({ functionResponse: { name: fc.name, response: { output } } });
-        console.log(`[SUCCESS] ${ts()} Tool "${fc.name}" returned`);
-      } catch (err) {
-        responseParts.push({ functionResponse: { name: fc.name, response: { error: err.message } } });
-        console.log(`[ERROR] ${ts()} Tool "${fc.name}" failed: ${err.message}`);
-      }
-    }
-
-    result = await chat.sendMessage(responseParts);
-    response = result.response;
-  }
-
-  return response.text();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Gemini generation using a pre-created cached context (@google/genai SDK).
- * The system instruction + workspace snapshot are already baked into the cache.
- * Runs the full agentic tool-use loop.
+ * Unified Gemini handler.
+ * - Expert Mode  : pass systemContext, leave cacheName null.
+ * - Project Mode : pass cacheName (system prompt is baked into the cache).
  */
-async function handleGeminiCached({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, cacheName }) {
-  console.log(`[INIT] ${ts()} handleGeminiCached() | model: ${model} | cache: ${cacheName}`);
+async function handleGemini({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, cacheName }) {
+  const startMs = Date.now();
+  console.log(`[INIT] ${ts()} handleGemini() | model: ${model} | cached: ${!!cacheName}`);
 
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
@@ -127,7 +72,7 @@ async function handleGeminiCached({ apiKey, model, message, history, toolDefs, e
     parameters: toGeminiSchema(t.inputSchema),
   }));
 
-  // Running conversation — system ctx is inside the cache, not repeated here
+  // ── Build request contents ────────────────────────────────────────────────
   const contents = [
     ...history.map(h => ({
       role: h.role === 'assistant' ? 'model' : 'user',
@@ -136,10 +81,20 @@ async function handleGeminiCached({ apiKey, model, message, history, toolDefs, e
     { role: 'user', parts: [{ text: message }] },
   ];
 
-  const config = {
-    cachedContent: cacheName,
-    ...(functionDeclarations.length > 0 && { tools: [{ functionDeclarations }] }),
-  };
+  // ── Build generation config ───────────────────────────────────────────────
+  const config = {};
+
+  if (cacheName) {
+    // Project Mode: system prompt is already inside the cache — do NOT repeat it
+    config.cachedContent = cacheName;
+  } else if (systemContext) {
+    // Expert Mode: send system prompt directly
+    config.systemInstruction = systemContext;
+  }
+
+  if (functionDeclarations.length > 0) {
+    config.tools = [{ functionDeclarations }];
+  }
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
   while (true) {
@@ -149,18 +104,20 @@ async function handleGeminiCached({ apiKey, model, message, history, toolDefs, e
 
     if (funcCalls.length === 0) {
       const text = parts.find(p => p.text)?.text ?? '';
-      console.log(`[SUCCESS] ${ts()} handleGeminiCached() complete`);
-      return text;
+      const latencyMs = Date.now() - startMs;
+      const standardizedUsage = mapProviderUsage(response.usageMetadata, 'gemini', { model, latencyMs });
+      console.log(`[SUCCESS] ${ts()} handleGemini() complete | latencyMs: ${latencyMs}`);
+      return { text, standardizedUsage };
     }
 
-    // Append model's tool-call turn to running contents
+    // Append model's tool-call turn and continue loop
     contents.push({ role: 'model', parts });
 
     const responseParts = [];
     for (const part of funcCalls) {
       const { name, args } = part.functionCall;
       toolsUsed.push(name);
-      console.log(`[INIT] ${ts()} GeminiCached → tool: ${name} | args: ${JSON.stringify(args)}`);
+      console.log(`[INIT] ${ts()} Gemini → tool: ${name} | args: ${JSON.stringify(args)}`);
       try {
         const raw    = await executeTool(name, args);
         const output = extractToolText(raw);
@@ -177,6 +134,8 @@ async function handleGeminiCached({ apiKey, model, message, history, toolDefs, e
 }
 
 async function handleOpenAI({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+  const startMs = Date.now();
+  console.log(`[INIT] ${ts()} handleOpenAI() | model: ${model}`);
   const OpenAI = (await import('openai')).default;
   const openai = new OpenAI({ apiKey });
 
@@ -227,12 +186,18 @@ async function handleOpenAI({ apiKey, model, message, history, toolDefs, execute
     });
   }
 
-  return response.choices[0].message.content ?? '';
+  const text = response.choices[0].message.content ?? '';
+  const latencyMs = Date.now() - startMs;
+  const standardizedUsage = mapProviderUsage(response.usage, 'openai', { model, latencyMs });
+  console.log(`[SUCCESS] ${ts()} handleOpenAI() complete | latencyMs: ${latencyMs}`);
+  return { text, standardizedUsage };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleClaude({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+  const startMs = Date.now();
+  console.log(`[INIT] ${ts()} handleClaude() | model: ${model}`);
   const Anthropic = (await import('@anthropic-ai/sdk')).default;
   const client = new Anthropic({ apiKey });
 
@@ -283,12 +248,18 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
     });
   }
 
-  return response.content.find(b => b.type === 'text')?.text ?? '';
+  const text = response.content.find(b => b.type === 'text')?.text ?? '';
+  const latencyMs = Date.now() - startMs;
+  const standardizedUsage = mapProviderUsage(response.usage, 'claude', { model, latencyMs });
+  console.log(`[SUCCESS] ${ts()} handleClaude() complete | latencyMs: ${latencyMs}`);
+  return { text, standardizedUsage };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleOllama({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+  const startMs = Date.now();
+  console.log(`[INIT] ${ts()} handleOllama() | model: ${model}`);
   const OpenAI = (await import('openai')).default;
   const openai = new OpenAI({
     baseURL: `${baseUrl ?? 'http://localhost:11434'}/v1`,
@@ -342,7 +313,11 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
     });
   }
 
-  return response.choices[0].message.content ?? '';
+  const text = response.choices[0].message.content ?? '';
+  const latencyMs = Date.now() - startMs;
+  const standardizedUsage = mapProviderUsage(response.usage, 'ollama', { model, latencyMs });
+  console.log(`[SUCCESS] ${ts()} handleOllama() complete | latencyMs: ${latencyMs}`);
+  return { text, standardizedUsage };
 }
 
 // ─── POST /api/chat/send ──────────────────────────────────────────────────────
@@ -394,31 +369,30 @@ router.post('/send', async (req, res) => {
   const commonArgs = { apiKey, model, message, history: windowedHistory, toolDefs, executeTool, toolsUsed, systemContext: systemContext ?? '' };
 
   try {
-    let reply = '';
+    let result;
+
     if (provider === 'gemini') {
       // ── Project Mode: attempt context cache ──────────────────────────────────
       let cacheName = null;
       if (activeWorkspacePath) {
         cacheName = await getOrCreateCache(apiKey, model, activeWorkspacePath, systemContext ?? '');
       }
-
-      if (cacheName) {
-        reply = await handleGeminiCached({ ...commonArgs, cacheName });
-      } else {
-        reply = await handleGemini(commonArgs);
-      }
+      result = await handleGemini({ ...commonArgs, cacheName });
     }
-    else if (provider === 'openai') reply = await handleOpenAI(commonArgs);
-    else if (provider === 'claude') reply = await handleClaude(commonArgs);
-    else if (provider === 'ollama') reply = await handleOllama({ ...commonArgs, baseUrl });
+    else if (provider === 'openai') result = await handleOpenAI(commonArgs);
+    else if (provider === 'claude') result = await handleClaude(commonArgs);
+    else if (provider === 'ollama') result = await handleOllama({ ...commonArgs, baseUrl });
     else return res.status(400).json({ error: `Unknown provider: "${provider}"` });
+
+    const reply             = result.text;
+    const standardizedUsage = result.standardizedUsage;
 
     // Persist to session history
     chatHistory.push({ role: 'user',      content: message });
     chatHistory.push({ role: 'assistant', content: reply });
 
-    console.log(`[SUCCESS] ${ts()} Chat complete | toolsUsed: [${toolsUsed.join(', ')}]`);
-    return res.json({ reply, toolsUsed });
+    console.log(`[SUCCESS] ${ts()} Chat complete | toolsUsed: [${toolsUsed.join(', ')}] | usage: ${JSON.stringify(standardizedUsage)}`);
+    return res.json({ reply, toolsUsed, standardizedUsage });
 
   } catch (err) {
     console.error(`[ERROR] ${ts()} Chat failed | ${err.message}`);

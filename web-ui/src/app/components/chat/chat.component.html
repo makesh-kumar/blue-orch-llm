@@ -162,6 +162,12 @@
                     class="badge bg-light text-muted border"
                     style="font-size: 0.65rem;">{{ t }}</span>
             </div>
+            <!-- Usage badge -->
+            <app-usage-badge
+              *ngIf="msg.standardizedUsage"
+              [usage]="msg.standardizedUsage"
+              [cost]="msg.turnCost ?? 0">
+            </app-usage-badge>
             <span class="msg-time">{{ msg.timestamp | date:'HH:mm' }}</span>
           </div>
         </div>
@@ -182,6 +188,21 @@
       </div>
 
     </div><!-- /chat-body -->
+
+    <!-- Session Cost Footer -->
+    <div class="session-cost-bar border-top px-4 py-1 d-flex align-items-center justify-content-between flex-shrink-0">
+      <span class="session-cost-label">
+        <i class="bi bi-calculator me-1 text-primary"></i>
+        <span class="fw-semibold text-secondary">Session Cost:</span>
+        <span class="session-cost-value ms-1">${{ totalSessionCost.toFixed(4) }}</span>
+      </span>
+      <button class="btn btn-sm session-cost-reset"
+              title="Reset session cost"
+              (click)="resetSessionCost()"
+              [disabled]="totalSessionCost === 0">
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </button>
+    </div>
 
     <!-- Input Area -->
     <div class="chat-input-area border-top px-4 py-2 flex-shrink-0">

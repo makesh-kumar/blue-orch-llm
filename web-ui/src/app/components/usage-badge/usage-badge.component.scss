@@ -1,0 +1,44 @@
+:host {
+  display: contents;
+}
+
+.usage-badge {
+  font-size: 0.68rem;
+  color: #6c757d;
+  background: transparent;
+}
+
+.badge-provider {
+  display: inline-flex;
+  align-items: center;
+  color: #6c757d;
+  font-size: 0.75rem;
+}
+
+.badge-stat {
+  display: inline-flex;
+  align-items: center;
+
+  .label {
+    color: #adb5bd;
+    margin-right: 2px;
+  }
+
+  .value {
+    color: #495057;
+  }
+}
+
+.badge-cost .value {
+  color: #0d6efd;
+}
+
+.badge-speed .value {
+  color: #198754;
+}
+
+.badge-divider {
+  color: #dee2e6;
+  font-size: 0.75rem;
+  user-select: none;
+}

@@ -5,6 +5,7 @@ import { ChatService, ChatMessage, ActiveTool } from '../../services/chat.servic
 import { LlmService, LlmRegistryEntry } from '../../services/llm.service';
 import { McpService } from '../../services/mcp.service';
 import { WorkspaceService } from '../../services/workspace.service';
+import { UsageCalculatorService } from '../../services/usage-calculator.service';
 
 // ─── System Instruction Constants ───────────────────────────────────────────
 
@@ -48,6 +49,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   errorMessage = '';
   showError = false;
 
+  // ── Token / Cost tracking
+  totalSessionCost = 0;
+
   // ── Project Mode (off by default — user opts in explicitly)
   isProjectModeActive = false;
 
@@ -58,6 +62,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     private llmService: LlmService,
     private mcpService: McpService,
     private workspaceService: WorkspaceService,
+    private usageCalc: UsageCalculatorService,
   ) {
     console.log(`[INIT] ${new Date().toISOString()} ChatComponent initialized`);
   }
@@ -232,15 +237,19 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       activeWorkspacePath: this.isProjectModeActive ? this.workspaceService.currentPath : undefined,
     }).subscribe({
       next: (res) => {
+        const turnCost = this.usageCalc.calculateCost(res.standardizedUsage);
+        this.totalSessionCost += turnCost;
         this.messages.push({
           role: 'assistant',
           content: res.reply,
           toolsUsed: res.toolsUsed,
           timestamp: new Date().toISOString(),
+          standardizedUsage: res.standardizedUsage,
+          turnCost,
         });
         this.isThinking = false;
         this.shouldScroll = true;
-        console.log(`[SUCCESS] ${new Date().toISOString()} Reply received | toolsUsed: [${res.toolsUsed.join(', ')}]`);
+        console.log(`[SUCCESS] ${new Date().toISOString()} Reply received | toolsUsed: [${res.toolsUsed.join(', ')}] | turnCost: $${turnCost.toFixed(6)} | sessionCost: $${this.totalSessionCost.toFixed(6)}`);
       },
       error: (err) => {
         this.isThinking = false;
@@ -262,10 +271,16 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.chatService.clearHistory().subscribe({
       next: () => {
         this.messages = [];
+        this.totalSessionCost = 0;
         console.log(`[SUCCESS] ${new Date().toISOString()} Chat history cleared`);
       },
       error: err => console.log(`[ERROR] ${new Date().toISOString()} Failed to clear history | ${err.message}`),
     });
+  }
+
+  resetSessionCost(): void {
+    this.totalSessionCost = 0;
+    console.log(`[SUCCESS] ${new Date().toISOString()} Session cost reset`);
   }
 
   showAlert(msg: string): void {
