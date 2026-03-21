@@ -22,6 +22,9 @@ export interface SendChatRequest {
   providerId: string;
   activeTools: ActiveTool[];
   systemContext?: string;
+  /** Absolute workspace path. Sent only when Project Mode is active.
+   *  Triggers context caching on the backend for Gemini providers. */
+  activeWorkspacePath?: string;
 }
 
 export interface SendChatResponse {

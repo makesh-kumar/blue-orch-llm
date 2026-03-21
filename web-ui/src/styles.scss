@@ -4,3 +4,93 @@ html, body {
   height: 100%;
   overflow: hidden;
 }
+
+/* ── Code block: rendered by ngx-markdown custom renderer ──────────────────────
+   Must be global — Angular view encapsulation would strip scoped attributes
+   from dynamically-injected innerHTML. */
+.code-block {
+  margin: 0.65rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #2a2b3d;
+  font-size: 0.82rem;
+
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.75rem;
+    background: #1a1b26;
+    border-bottom: 1px solid #2a2b3d;
+    min-height: 32px;
+  }
+
+  .code-lang-label {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #89b4fa;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .code-copy-btn {
+    /* Explicit color overrides Bootstrap reboot's `color: inherit`
+       which would inherit body #212529 (invisible on dark header) */
+    background: #2a2b3d;
+    border: 1px solid #6c7086;
+    border-radius: 0.3rem;
+    color: #cdd6f4 !important;   /* high-contrast lavender-white */
+    font-size: 0.7rem;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    padding: 0.15rem 0.55rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    line-height: 1.4;
+    user-select: none;
+
+    &:hover  { background: #3b3c52; border-color: #89b4fa; color: #ffffff !important; }
+    &:active { background: #4a4b6a; }
+  }
+
+  .code-pre {
+    margin: 0;
+    padding: 0.4rem 0;
+    background: #1e1e2e;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 0;
+
+    code {
+      display: block;
+      background: transparent;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 0.82rem;
+      line-height: 1;
+      white-space: pre;
+      counter-reset: line-number;
+      min-width: max-content;
+    }
+
+    .code-line {
+      display: block;
+      padding: 0 1.25rem 0 3.75rem;
+      position: relative;
+
+      &::before {
+        counter-increment: line-number;
+        content: counter(line-number);
+        position: absolute;
+        left: 0;
+        width: 3rem;
+        text-align: right;
+        padding-right: 0.6rem;
+        color: #3d405a;
+        user-select: none;
+        font-size: 0.75rem;
+        line-height: inherit;
+      }
+    }
+  }
+}

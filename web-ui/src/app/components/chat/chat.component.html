@@ -153,7 +153,9 @@
             <i class="bi bi-robot"></i>
           </div>
           <div class="d-flex flex-column align-items-start gap-1">
-            <div class="msg-bubble msg-ai">{{ msg.content }}</div>
+            <div class="msg-bubble msg-ai markdown-body">
+              <markdown [data]="msg.content" [disableSanitizer]="true"></markdown>
+            </div>
             <div *ngIf="msg.toolsUsed && msg.toolsUsed.length > 0" class="d-flex align-items-center flex-wrap gap-1">
               <i class="bi bi-tools text-muted" style="font-size: 0.7rem;"></i>
               <span *ngFor="let t of msg.toolsUsed"

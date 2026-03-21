@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { connectedLlmRegistry } from './llm.routes.js';
 import { activeClients } from './mcp.routes.js';
+import { getOrCreateCache, truncateIfLarge } from './cache-manager.js';
 
 const router = Router();
 const ts = () => new Date().toISOString();
@@ -37,13 +38,17 @@ function toGeminiSchema(schema) {
   return out;
 }
 
-/** Extract readable text from an MCP callTool result object. */
+/** Extract readable text from an MCP callTool result object.
+ * Applies token-safety truncation if the output exceeds 10 000 chars. */
 function extractToolText(result) {
   // MCP result: { content: [{ type: 'text', text: '...' }] }
+  let text;
   if (Array.isArray(result?.content)) {
-    return result.content.map(c => c.text ?? JSON.stringify(c)).join('\n');
+    text = result.content.map(c => c.text ?? JSON.stringify(c)).join('\n');
+  } else {
+    text = JSON.stringify(result ?? '');
   }
-  return JSON.stringify(result ?? '');
+  return truncateIfLarge(text);
 }
 
 // ─── Provider handlers ─────────────────────────────────────────────────────────
@@ -102,6 +107,74 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Gemini generation using a pre-created cached context (@google/genai SDK).
+ * The system instruction + workspace snapshot are already baked into the cache.
+ * Runs the full agentic tool-use loop.
+ */
+async function handleGeminiCached({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, cacheName }) {
+  console.log(`[INIT] ${ts()} handleGeminiCached() | model: ${model} | cache: ${cacheName}`);
+
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey });
+
+  const functionDeclarations = toolDefs.map(t => ({
+    name: t.name,
+    description: t.description ?? '',
+    parameters: toGeminiSchema(t.inputSchema),
+  }));
+
+  // Running conversation — system ctx is inside the cache, not repeated here
+  const contents = [
+    ...history.map(h => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }],
+    })),
+    { role: 'user', parts: [{ text: message }] },
+  ];
+
+  const config = {
+    cachedContent: cacheName,
+    ...(functionDeclarations.length > 0 && { tools: [{ functionDeclarations }] }),
+  };
+
+  // ── Agentic tool loop ────────────────────────────────────────────────────────
+  while (true) {
+    const response  = await ai.models.generateContent({ model, contents, config });
+    const parts     = response.candidates?.[0]?.content?.parts ?? [];
+    const funcCalls = parts.filter(p => p.functionCall);
+
+    if (funcCalls.length === 0) {
+      const text = parts.find(p => p.text)?.text ?? '';
+      console.log(`[SUCCESS] ${ts()} handleGeminiCached() complete`);
+      return text;
+    }
+
+    // Append model's tool-call turn to running contents
+    contents.push({ role: 'model', parts });
+
+    const responseParts = [];
+    for (const part of funcCalls) {
+      const { name, args } = part.functionCall;
+      toolsUsed.push(name);
+      console.log(`[INIT] ${ts()} GeminiCached → tool: ${name} | args: ${JSON.stringify(args)}`);
+      try {
+        const raw    = await executeTool(name, args);
+        const output = extractToolText(raw);
+        responseParts.push({ functionResponse: { name, response: { output } } });
+        console.log(`[SUCCESS] ${ts()} Tool "${name}" returned`);
+      } catch (err) {
+        responseParts.push({ functionResponse: { name, response: { error: err.message } } });
+        console.log(`[ERROR] ${ts()} Tool "${name}" failed: ${err.message}`);
+      }
+    }
+
+    contents.push({ role: 'user', parts: responseParts });
+  }
+}
 
 async function handleOpenAI({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
   const OpenAI = (await import('openai')).default;
@@ -273,9 +346,9 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
 }
 
 // ─── POST /api/chat/send ──────────────────────────────────────────────────────
-// Body: { message, providerId, activeTools, systemContext? }
+// Body: { message, providerId, activeTools, systemContext?, activeWorkspacePath? }
 router.post('/send', async (req, res) => {
-  const { message, providerId, activeTools, systemContext } = req.body;
+  const { message, providerId, activeTools, systemContext, activeWorkspacePath } = req.body;
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: '"message" (string) is required' });
@@ -314,12 +387,27 @@ router.post('/send', async (req, res) => {
 
   console.log(`[INIT] ${ts()} /chat/send | provider: ${provider} | model: ${model} | tools: ${toolDefs.length} | history: ${chatHistory.length}`);
 
-  const toolsUsed = [];
-  const commonArgs = { apiKey, model, message, history: [...chatHistory], toolDefs, executeTool, toolsUsed, systemContext: systemContext ?? '' };
+  // ── 10-message sliding window (system_instruction is always in systemContext, not history) ──
+  const windowedHistory = chatHistory.slice(-10);
+
+  const toolsUsed  = [];
+  const commonArgs = { apiKey, model, message, history: windowedHistory, toolDefs, executeTool, toolsUsed, systemContext: systemContext ?? '' };
 
   try {
     let reply = '';
-    if      (provider === 'gemini') reply = await handleGemini(commonArgs);
+    if (provider === 'gemini') {
+      // ── Project Mode: attempt context cache ──────────────────────────────────
+      let cacheName = null;
+      if (activeWorkspacePath) {
+        cacheName = await getOrCreateCache(apiKey, model, activeWorkspacePath, systemContext ?? '');
+      }
+
+      if (cacheName) {
+        reply = await handleGeminiCached({ ...commonArgs, cacheName });
+      } else {
+        reply = await handleGemini(commonArgs);
+      }
+    }
     else if (provider === 'openai') reply = await handleOpenAI(commonArgs);
     else if (provider === 'claude') reply = await handleClaude(commonArgs);
     else if (provider === 'ollama') reply = await handleOllama({ ...commonArgs, baseUrl });

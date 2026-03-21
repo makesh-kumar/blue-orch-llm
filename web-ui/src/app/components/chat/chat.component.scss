@@ -143,6 +143,7 @@
     background-color: #fff;
     color: #212529;
     border: 1px solid #dee2e6;
+    white-space: normal; // override pre-wrap — markdown renders HTML, not raw text
     border-bottom-left-radius: 0.25rem;
   }
 }
@@ -190,6 +191,139 @@
   40%           { transform: scale(1);   opacity: 1; }
 }
 
+// ── Markdown prose inside AI bubbles ─────────────────────────────────────────────
+.markdown-body {
+  // Reset
+  line-height: 1.5;
+  font-size: 0.9rem;
+  color: #212529;
+  word-break: break-word;
+  min-width: 0;
+  white-space: normal;
+
+  // ngx-markdown wraps output in <p> — remove excess margin on first/last
+  > :first-child { margin-top: 0 !important; }
+  > :last-child  { margin-bottom: 0 !important; }
+
+  p { margin-bottom: 0.3rem; line-height: 1.5; }
+
+  // Headings
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0.9rem 0 0.35rem;
+    color: #1a1a2e;
+  }
+  h1 { font-size: 1.2rem; }
+  h2 { font-size: 1.08rem; }
+  h3 { font-size: 0.98rem; }
+  h4, h5, h6 { font-size: 0.9rem; }
+
+  // Inline code
+  code:not(pre > code) {
+    background: #eef2ff;
+    color: #3730a3;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.82em;
+    padding: 0.15em 0.4em;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+  }
+
+  // Code blocks
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 0.5rem;
+    padding: 0.9rem 1rem;
+    margin: 0.6rem 0;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.55;
+
+    code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      font-size: inherit;
+      white-space: pre;
+    }
+  }
+
+  // Lists
+  ul, ol {
+    padding-left: 1.4rem;
+    margin-bottom: 0.55rem;
+
+    li + li { margin-top: 0.2rem; }
+  }
+
+  // Blockquote
+  blockquote {
+    border-left: 3px solid #0d6efd;
+    margin: 0.6rem 0;
+    padding: 0.4rem 0.8rem;
+    color: #495057;
+    background: #f0f4ff;
+    border-radius: 0 0.25rem 0.25rem 0;
+    font-style: italic;
+
+    p { margin-bottom: 0; }
+  }
+
+  // Tables
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0.6rem 0;
+
+    th {
+      background: #f0f4ff;
+      font-weight: 700;
+      text-align: left;
+      padding: 0.4rem 0.65rem;
+      border: 1px solid #dee2e6;
+    }
+
+    td {
+      padding: 0.35rem 0.65rem;
+      border: 1px solid #dee2e6;
+    }
+
+    tr:nth-child(even) td { background: #f8f9fa; }
+  }
+
+  // Horizontal rule
+  hr {
+    border: none;
+    border-top: 1px solid #dee2e6;
+    margin: 0.75rem 0;
+  }
+
+  // Code blocks — handled by .code-block wrapper below; nullify default pre styles
+  pre {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    font-size: inherit;
+
+    code { background: transparent; color: inherit; padding: 0; }
+  }
+
+  // Bold / italic
+  strong { font-weight: 700; color: #1a1a2e; }
+  em     { font-style: italic; }
+
+  // Links
+  a {
+    color: #0d6efd;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
 // ── Input area ────────────────────────────────────────────────────────────────
 .chat-input-area {
   position: relative;  // anchor for the floating toast
@@ -205,6 +339,7 @@
   }
 }
 
+// ── Custom code block (replaces ngx-markdown default pre) ────────────────────────
 // ── Project / Expert Mode segmented selector ─────────────────────────────────
 .mode-segment {
   display: inline-flex;

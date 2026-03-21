@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ChatService, ChatMessage, ActiveTool } from '../../services/chat.service';
@@ -228,6 +228,8 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       providerId: this.selectedProviderId,
       activeTools,
       systemContext: this.systemInstruction,
+      // Project Mode: send workspace path so the backend can build/reuse a cache
+      activeWorkspacePath: this.isProjectModeActive ? this.workspaceService.currentPath : undefined,
     }).subscribe({
       next: (res) => {
         this.messages.push({
@@ -280,5 +282,29 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       const el = this.chatBodyRef?.nativeElement;
       if (el) el.scrollTop = el.scrollHeight;
     } catch (_) {}
+  }
+
+  // ── Code block copy — event delegation (onclick stripped by DomSanitizer) ───
+  @HostListener('click', ['$event'])
+  onCopyClick(event: MouseEvent): void {
+    const btn = (event.target as HTMLElement).closest('.code-copy-btn') as HTMLButtonElement | null;
+    if (!btn) return;
+
+    const codeEl = btn.closest('.code-block')?.querySelector('code');
+    if (!codeEl) return;
+
+    // textContent gives raw code text; ::before pseudo-elements are excluded
+    const text = (codeEl.textContent ?? '').trim();
+    const orig = btn.textContent ?? 'Copy';
+
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      console.log(`[SUCCESS] ${new Date().toISOString()} Code block copied to clipboard`);
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }).catch(err => {
+      btn.textContent = 'Error';
+      console.log(`[ERROR] ${new Date().toISOString()} Clipboard write failed | ${err.message}`);
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    });
   }
 }
