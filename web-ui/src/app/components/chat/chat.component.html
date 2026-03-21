@@ -93,40 +93,63 @@
   <div class="chat-main">
 
     <!-- Chat Header -->
-    <div class="chat-header border-bottom px-2 py-0 d-flex align-items-center gap-1 flex-shrink-0">
-      <div class="d-flex align-items-center gap-1">
-              <i class="bi bi-chat-dots-fill text-primary"></i>
-      <span class="fw-semibold">Chat</span>
+    <div class="chat-header border-bottom flex-shrink-0">
+      <div class="chat-header-row chat-header-top px-3 py-2">
+        <div class="chat-title-wrap">
+          <i class="bi bi-chat-dots-fill text-primary"></i>
+          <span class="fw-semibold">Chat</span>
+        </div>
 
-      <ng-container *ngIf="getSelectedProvider() as sel">
-        <span class="badge bg-primary">
-          <i class="bi me-1" [ngClass]="providerIconClass(sel.provider)"></i>
-          {{ sel.provider | titlecase }} — {{ sel.model }}
-        </span>
-      </ng-container>
+        <!-- Project / Expert Mode segmented selector -->
+        <div class="mode-segment flex-shrink-0" role="group" aria-label="Chat mode">
+          <input type="radio" class="btn-check" name="chatMode" id="modeExpert"
+                 [value]="false" [(ngModel)]="isProjectModeActive" autocomplete="off">
+          <label class="btn btn-sm mode-btn mode-btn-expert" for="modeExpert">
+            <i class="bi bi-globe2 me-1"></i>Expert Mode
+          </label>
 
-      <span *ngIf="activeToolCount > 0" class="badge bg-success">
-        <i class="bi bi-tools me-1"></i>{{ activeToolCount }} tool{{ activeToolCount === 1 ? '' : 's' }} active
-      </span>
+          <input type="radio" class="btn-check" name="chatMode" id="modeProject"
+                 [value]="true" [(ngModel)]="isProjectModeActive" autocomplete="off">
+          <label class="btn btn-sm mode-btn mode-btn-project" for="modeProject">
+            <i class="bi bi-folder2-open me-1"></i>Project Mode
+          </label>
+        </div>
       </div>
 
-      <!-- Project / Expert Mode segmented selector — right end -->
-      <div class="mode-segment flex-shrink-0" role="group" aria-label="Chat mode">
-        <input type="radio" class="btn-check" name="chatMode" id="modeExpert"
-               [value]="false" [(ngModel)]="isProjectModeActive" autocomplete="off">
-        <label class="btn btn-sm mode-btn mode-btn-expert" for="modeExpert">
-          <i class="bi bi-globe2 me-1"></i>Expert Mode
-        </label>
+      <div class="chat-header-row chat-header-bottom px-3 pb-2">
+        <div class="meta-strip">
+          <ng-container *ngIf="getSelectedProvider() as sel">
+            <span class="badge bg-primary">
+              <i class="bi me-1" [ngClass]="providerIconClass(sel.provider)"></i>
+              {{ sel.provider | titlecase }} — {{ sel.model }}
+            </span>
+          </ng-container>
 
-        <input type="radio" class="btn-check" name="chatMode" id="modeProject"
-               [value]="true" [(ngModel)]="isProjectModeActive" autocomplete="off">
-        <label class="btn btn-sm mode-btn mode-btn-project" for="modeProject">
-          <i class="bi bi-folder2-open me-1"></i>Project Mode
-        </label>
+          <span *ngIf="activeToolCount > 0" class="badge bg-success">
+            <i class="bi bi-tools me-1"></i>{{ activeToolCount }} tool{{ activeToolCount === 1 ? '' : 's' }} active
+          </span>
+        </div>
+
+        <!-- Workspace context only in project mode -->
+        <div class="context-strip" *ngIf="isProjectModeActive">
+          <span class="context-item" [title]="workspaceService.currentPath">
+            <i class="bi bi-folder2-open text-primary"></i>
+            <span class="font-monospace context-path" [title]="workspaceService.currentPath">{{ truncatePath(workspaceService.currentPath) }}</span>
+          </span>
+
+          <ng-container *ngIf="(workspaceService.contextFiles$ | async)?.length as fc">
+            <span class="badge bg-success" style="font-size:0.68rem;">
+              <i class="bi bi-file-earmark-check me-1"></i>{{ fc }} file{{ fc === 1 ? '' : 's' }}
+            </span>
+          </ng-container>
+
+          <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                  (click)="navigateToWorkspace.emit()"
+                  title="Go to Workspace tab to manage files">
+            <i class="bi bi-folder-tree me-1"></i>Change
+          </button>
+        </div>
       </div>
-
-      <!-- Workspace bar — inline, fills available space -->
-      <app-workspace-bar class="header-workspace"></app-workspace-bar>
     </div>
 
     <!-- Messages -->
@@ -223,6 +246,14 @@
                   (keydown)="onEnter($event)"
                   [disabled]="isThinking"
                   style="resize: none;"></textarea>
+
+        <button class="btn btn-outline-danger px-3"
+                *ngIf="isThinking"
+                (click)="stopGeneration()"
+                title="Stop current response">
+          <i class="bi bi-stop-fill"></i>
+        </button>
+
         <button class="btn btn-primary px-4"
                 (click)="sendMessage()"
                 [disabled]="!inputMessage.trim() || isThinking">

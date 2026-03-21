@@ -11,6 +11,12 @@ export interface FolderItem {
   path: string;
 }
 
+export interface FileTreeItem {
+  name: string;
+  type: 'file' | 'directory';
+  path: string;
+}
+
 export interface ProxyToolResponse {
   connectionId: string;
   toolName: string;
@@ -32,6 +38,23 @@ export class WorkspaceService {
 
   /** Current active workspace path, broadcast to subscribers. */
   readonly activePath$ = new BehaviorSubject<string>('');
+
+  /** Specific files pinned into AI context. Empty = entire activePath folder is used. */
+  readonly contextFiles$ = new BehaviorSubject<string[]>([]);
+
+  get contextFiles(): string[] {
+    return this.contextFiles$.value;
+  }
+
+  setContextFiles(files: string[]): void {
+    this.contextFiles$.next([...files]);
+    console.log(`[SUCCESS] ${new Date().toISOString()} WorkspaceService.setContextFiles() | ${files.length} file(s)`);
+  }
+
+  clearContextFiles(): void {
+    this.contextFiles$.next([]);
+    console.log(`[SUCCESS] ${new Date().toISOString()} WorkspaceService.clearContextFiles()`);
+  }
 
   constructor(private http: HttpClient) {
     console.log(`[INIT] ${new Date().toISOString()} WorkspaceService constructed`);
@@ -85,6 +108,48 @@ export class WorkspaceService {
       `All file operations should default to this directory. ` +
       `If the user mentions "this folder" or "my code," they are referring to this path.`
     );
+  }
+
+  /**
+   * Fetch one level of children for a directory via the native backend endpoint.
+   * Called per lazy-load expand in the file explorer.
+   */
+  getFileTree(dirPath: string): Observable<FileTreeItem[]> {
+    console.log(`[INIT] ${new Date().toISOString()} WorkspaceService.getFileTree() | path: "${dirPath}"`);
+    return this.http
+      .get<{ children: FileTreeItem[] }>(`${this.backendUrl}/api/system/files/tree`, {
+        params: { path: dirPath },
+      })
+      .pipe(
+        map(res => res.children),
+        tap(items => console.log(`[SUCCESS] ${new Date().toISOString()} WorkspaceService.getFileTree() | ${items.length} items at "${dirPath}"`)),
+      );
+  }
+
+  readFile(filePath: string): Observable<string> {
+    console.log(`[INIT] ${new Date().toISOString()} WorkspaceService.readFile() | path: "${filePath}"`);
+    return this.http
+      .get<{ content: string; path: string }>(`${this.backendUrl}/api/system/files/read`, {
+        params: { path: filePath },
+      })
+      .pipe(
+        map(res => res.content),
+        tap(() => console.log(`[SUCCESS] ${new Date().toISOString()} WorkspaceService.readFile() | "${filePath}"`)),
+      );
+  }
+
+  writeFile(filePath: string, content: string): Observable<void> {
+    console.log(`[INIT] ${new Date().toISOString()} WorkspaceService.writeFile() | path: "${filePath}"`);
+    return this.http
+      .put<void>(`${this.backendUrl}/api/system/files/write`, { path: filePath, content })
+      .pipe(tap(() => console.log(`[SUCCESS] ${new Date().toISOString()} WorkspaceService.writeFile() | "${filePath}"`)));
+  }
+
+  createFile(filePath: string, type: 'file' | 'directory' = 'file'): Observable<void> {
+    console.log(`[INIT] ${new Date().toISOString()} WorkspaceService.createFile() | path: "${filePath}"`);
+    return this.http
+      .post<void>(`${this.backendUrl}/api/system/files/create`, { path: filePath, type })
+      .pipe(tap(() => console.log(`[SUCCESS] ${new Date().toISOString()} WorkspaceService.createFile() | "${filePath}"`)));
   }
 
   /**

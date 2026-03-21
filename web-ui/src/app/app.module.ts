@@ -2,6 +2,7 @@ import { NgModule, SecurityContext } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { CdkTreeModule } from '@angular/cdk/tree';
 import { MARKED_OPTIONS, MarkdownModule, MarkedOptions, MarkedRenderer } from 'ngx-markdown';
 import hljs from 'highlight.js';
 
@@ -11,8 +12,10 @@ import { McpConfigComponent } from './components/mcp-config/mcp-config.component
 import { LlmConfigComponent } from './components/llm-config/llm-config.component';
 import { ChatComponent } from './components/chat/chat.component';
 import { WorkspaceBarComponent } from './components/workspace-bar/workspace-bar.component';
+import { WorkspaceTabComponent } from './components/workspace-tab/workspace-tab.component';
 import { TokenBadgeComponent } from './components/token-badge/token-badge.component';
 import { UsageBadgeComponent } from './components/usage-badge/usage-badge.component';
+import { MonacoEditorModule } from 'ngx-monaco-editor-v2';
 
 // ─── Custom Marked renderer ────────────────────────────────────────────────────────────
 // Must be an exported named function (not lambda) for AOT compatibility.
@@ -78,12 +81,15 @@ export function markedOptionsFactory(): MarkedOptions {
     WorkspaceBarComponent,
     TokenBadgeComponent,
     UsageBadgeComponent,
+    WorkspaceTabComponent,
   ],
   imports: [
     BrowserModule,
     HttpClientModule,
     FormsModule,
     ReactiveFormsModule,
+    CdkTreeModule,
+    MonacoEditorModule.forRoot({ baseUrl: 'assets/monaco' }),
     MarkdownModule.forRoot({
       sanitize: SecurityContext.NONE,
       markedOptions: {

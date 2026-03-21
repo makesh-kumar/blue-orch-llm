@@ -82,7 +82,63 @@
 
 .chat-header {
   background-color: #fff;
-  min-height: 48px;
+  min-height: 70px;
+}
+
+.chat-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.chat-header-top {
+  justify-content: space-between;
+}
+
+.chat-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #1f2937;
+}
+
+.chat-header-bottom {
+  justify-content: space-between;
+  border-top: 1px solid #f1f3f5;
+  padding-top: 0.45rem;
+}
+
+.meta-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.context-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: 56%;
+}
+
+.context-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #6c757d;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+
+.context-path {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 // ── Messages area ─────────────────────────────────────────────────────────────
@@ -374,6 +430,12 @@
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
   }
+
+  .btn-outline-danger {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
 }
 
 // ── Custom code block (replaces ngx-markdown default pre) ────────────────────────
@@ -449,4 +511,16 @@ app-workspace-bar.header-workspace {
   border: 1px solid #f5c2c7;
   border-radius: 0.375rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 992px) {
+  .chat-header-top,
+  .chat-header-bottom {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .context-strip {
+    max-width: 100%;
+  }
 }

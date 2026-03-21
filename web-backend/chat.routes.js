@@ -52,6 +52,29 @@ function extractToolText(result) {
   return truncateIfLarge(text);
 }
 
+/** Race an async operation against an AbortSignal.
+ * This prevents long-running provider calls from continuing app flow after client stop. */
+function withAbort(promise, abortSignal) {
+  if (!abortSignal) return promise;
+  if (abortSignal.aborted) throw new Error('Request cancelled by client');
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new Error('Request cancelled by client'));
+    abortSignal.addEventListener('abort', onAbort, { once: true });
+
+    promise.then(
+      (value) => {
+        abortSignal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (err) => {
+        abortSignal.removeEventListener('abort', onAbort);
+        reject(err);
+      }
+    );
+  });
+}
+
 // ─── Provider handlers ─────────────────────────────────────────────────────────
 
 /**
@@ -59,7 +82,7 @@ function extractToolText(result) {
  * - Expert Mode  : pass systemContext, leave cacheName null.
  * - Project Mode : pass cacheName (system prompt is baked into the cache).
  */
-async function handleGemini({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, cacheName }) {
+async function handleGemini({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, cacheName, abortSignal, ensureNotCancelled }) {
   const startMs = Date.now();
   console.log(`[INIT] ${ts()} handleGemini() | model: ${model} | cached: ${!!cacheName}`);
 
@@ -98,7 +121,12 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
   while (true) {
-    const response  = await ai.models.generateContent({ model, contents, config });
+    ensureNotCancelled();
+    const response = await withAbort(
+      ai.models.generateContent({ model, contents, config }),
+      abortSignal
+    );
+    ensureNotCancelled();
     const parts     = response.candidates?.[0]?.content?.parts ?? [];
     const funcCalls = parts.filter(p => p.functionCall);
 
@@ -115,6 +143,7 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
 
     const responseParts = [];
     for (const part of funcCalls) {
+      ensureNotCancelled();
       const { name, args } = part.functionCall;
       toolsUsed.push(name);
       console.log(`[INIT] ${ts()} Gemini → tool: ${name} | args: ${JSON.stringify(args)}`);
@@ -133,7 +162,7 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
   }
 }
 
-async function handleOpenAI({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+async function handleOpenAI({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, abortSignal, ensureNotCancelled }) {
   const startMs = Date.now();
   console.log(`[INIT] ${ts()} handleOpenAI() | model: ${model}`);
   const OpenAI = (await import('openai')).default;
@@ -154,18 +183,22 @@ async function handleOpenAI({ apiKey, model, message, history, toolDefs, execute
     { role: 'user', content: message },
   ];
 
+  ensureNotCancelled();
   let response = await openai.chat.completions.create({
     model,
     messages,
     ...(tools.length > 0 && { tools, tool_choice: 'auto' }),
-  });
+  }, { signal: abortSignal });
+  ensureNotCancelled();
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
   while (response.choices[0].finish_reason === 'tool_calls') {
+    ensureNotCancelled();
     const assistantMsg = response.choices[0].message;
     messages.push(assistantMsg);
 
     for (const tc of assistantMsg.tool_calls) {
+      ensureNotCancelled();
       toolsUsed.push(tc.function.name);
       console.log(`[INIT] ${ts()} OpenAI → tool: ${tc.function.name}`);
       let content;
@@ -183,7 +216,8 @@ async function handleOpenAI({ apiKey, model, message, history, toolDefs, execute
 
     response = await openai.chat.completions.create({
       model, messages, tools, tool_choice: 'auto',
-    });
+    }, { signal: abortSignal });
+    ensureNotCancelled();
   }
 
   const text = response.choices[0].message.content ?? '';
@@ -195,7 +229,7 @@ async function handleOpenAI({ apiKey, model, message, history, toolDefs, execute
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleClaude({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+async function handleClaude({ apiKey, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, abortSignal, ensureNotCancelled }) {
   const startMs = Date.now();
   console.log(`[INIT] ${ts()} handleClaude() | model: ${model}`);
   const Anthropic = (await import('@anthropic-ai/sdk')).default;
@@ -212,22 +246,26 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
     { role: 'user', content: message },
   ];
 
+  ensureNotCancelled();
   let response = await client.messages.create({
     model,
     max_tokens: 4096,
     ...(systemContext && { system: systemContext }),
     ...(tools.length > 0 && { tools }),
     messages,
-  });
+  }, { signal: abortSignal });
+  ensureNotCancelled();
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
   while (response.stop_reason === 'tool_use') {
+    ensureNotCancelled();
     const assistantContent = response.content;
     messages.push({ role: 'assistant', content: assistantContent });
 
     const toolResults = [];
     for (const block of assistantContent) {
       if (block.type !== 'tool_use') continue;
+      ensureNotCancelled();
       toolsUsed.push(block.name);
       console.log(`[INIT] ${ts()} Claude → tool: ${block.name}`);
       let content;
@@ -245,7 +283,8 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
     messages.push({ role: 'user', content: toolResults });
     response = await client.messages.create({
       model, max_tokens: 4096, tools, messages,
-    });
+    }, { signal: abortSignal });
+    ensureNotCancelled();
   }
 
   const text = response.content.find(b => b.type === 'text')?.text ?? '';
@@ -257,7 +296,7 @@ async function handleClaude({ apiKey, model, message, history, toolDefs, execute
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleOllama({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+async function handleOllama({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, abortSignal, ensureNotCancelled }) {
   const startMs = Date.now();
   console.log(`[INIT] ${ts()} handleOllama() | model: ${model}`);
   const OpenAI = (await import('openai')).default;
@@ -281,18 +320,22 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
     { role: 'user', content: message },
   ];
 
+  ensureNotCancelled();
   let response = await openai.chat.completions.create({
     model,
     messages,
     ...(tools.length > 0 && { tools, tool_choice: 'auto' }),
-  });
+  }, { signal: abortSignal });
+  ensureNotCancelled();
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
   while (response.choices[0].finish_reason === 'tool_calls') {
+    ensureNotCancelled();
     const assistantMsg = response.choices[0].message;
     messages.push(assistantMsg);
 
     for (const tc of assistantMsg.tool_calls) {
+      ensureNotCancelled();
       toolsUsed.push(tc.function.name);
       console.log(`[INIT] ${ts()} Ollama → tool: ${tc.function.name}`);
       let content;
@@ -310,7 +353,8 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
 
     response = await openai.chat.completions.create({
       model, messages, tools, tool_choice: 'auto',
-    });
+    }, { signal: abortSignal });
+    ensureNotCancelled();
   }
 
   const text = response.choices[0].message.content ?? '';
@@ -322,7 +366,7 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleLmStudio({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+async function handleLmStudio({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext, abortSignal, ensureNotCancelled }) {
   const startMs = Date.now();
   console.log(`[INIT] ${ts()} handleLmStudio() | model: ${model}`);
   const OpenAI = (await import('openai')).default;
@@ -346,7 +390,7 @@ async function handleLmStudio({ baseUrl, model, message, history, toolDefs, exec
 
   const callLmStudio = async (payload) => {
     try {
-      return await openai.chat.completions.create(payload);
+      return await openai.chat.completions.create(payload, { signal: abortSignal });
     } catch (err) {
       const isRefused = err.cause?.code === 'ECONNREFUSED' || err.code === 'ECONNREFUSED';
       if (isRefused) throw new Error('LM Studio Server Not Found. Enable Developer Mode and Start Server in LM Studio.');
@@ -354,18 +398,22 @@ async function handleLmStudio({ baseUrl, model, message, history, toolDefs, exec
     }
   };
 
+  ensureNotCancelled();
   let response = await callLmStudio({
     model,
     messages,
     ...(tools.length > 0 && { tools, tool_choice: 'auto' }),
   });
+  ensureNotCancelled();
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
   while (response.choices[0].finish_reason === 'tool_calls') {
+    ensureNotCancelled();
     const assistantMsg = response.choices[0].message;
     messages.push(assistantMsg);
 
     for (const tc of assistantMsg.tool_calls) {
+      ensureNotCancelled();
       toolsUsed.push(tc.function.name);
       console.log(`[INIT] ${ts()} LMStudio → tool: ${tc.function.name}`);
       let content;
@@ -382,6 +430,7 @@ async function handleLmStudio({ baseUrl, model, message, history, toolDefs, exec
     }
 
     response = await callLmStudio({ model, messages, tools, tool_choice: 'auto' });
+    ensureNotCancelled();
   }
 
   const text = response.choices[0].message.content ?? '';
@@ -411,6 +460,30 @@ router.post('/send', async (req, res) => {
   }
 
   const { provider, model, apiKey, baseUrl } = llmConfig;
+  const abortController = new AbortController();
+  let requestCancelled = false;
+
+  const markCancelled = () => {
+    if (requestCancelled) return;
+    requestCancelled = true;
+    abortController.abort();
+    console.log(`[INIT] ${ts()} /chat/send cancelled by client disconnect`);
+  };
+
+  // Trigger cancellation only when client aborts or disconnects early.
+  // NOTE: req "close" also fires on normal request completion, so do not use it here.
+  const onAborted = () => markCancelled();
+  const onResClose = () => {
+    if (!res.writableEnded) markCancelled();
+  };
+  req.on('aborted', onAborted);
+  res.on('close', onResClose);
+
+  const ensureNotCancelled = () => {
+    if (requestCancelled || abortController.signal.aborted) {
+      throw new Error('Request cancelled by client');
+    }
+  };
 
   // ── Build tool definitions and executor lookup ────────────────────────────
   const toolLookup = {};   // toolName → connectionId
@@ -426,11 +499,17 @@ router.post('/send', async (req, res) => {
   }
 
   const executeTool = async (toolName, toolArgs) => {
+    ensureNotCancelled();
     const connectionId = toolLookup[toolName];
     if (!connectionId) throw new Error(`No MCP connection for tool "${toolName}"`);
     const mcpEntry = activeClients.get(connectionId);
     if (!mcpEntry) throw new Error(`MCP connection "${connectionId}" is no longer active`);
-    return mcpEntry.client.callTool({ name: toolName, arguments: toolArgs ?? {} });
+    const result = await withAbort(
+      mcpEntry.client.callTool({ name: toolName, arguments: toolArgs ?? {} }),
+      abortController.signal
+    );
+    ensureNotCancelled();
+    return result;
   };
 
   console.log(`[INIT] ${ts()} /chat/send | provider: ${provider} | model: ${model} | tools: ${toolDefs.length} | history: ${chatHistory.length}`);
@@ -439,7 +518,18 @@ router.post('/send', async (req, res) => {
   const windowedHistory = chatHistory.slice(-10);
 
   const toolsUsed  = [];
-  const commonArgs = { apiKey, model, message, history: windowedHistory, toolDefs, executeTool, toolsUsed, systemContext: systemContext ?? '' };
+  const commonArgs = {
+    apiKey,
+    model,
+    message,
+    history: windowedHistory,
+    toolDefs,
+    executeTool,
+    toolsUsed,
+    systemContext: systemContext ?? '',
+    abortSignal: abortController.signal,
+    ensureNotCancelled,
+  };
 
   try {
     let result;
@@ -469,8 +559,15 @@ router.post('/send', async (req, res) => {
     return res.json({ reply, toolsUsed, standardizedUsage });
 
   } catch (err) {
+    if (requestCancelled || err.message === 'Request cancelled by client') {
+      console.log(`[SUCCESS] ${ts()} Chat stopped by client`);
+      return;
+    }
     console.error(`[ERROR] ${ts()} Chat failed | ${err.message}`);
     return res.status(500).json({ error: err.message });
+  } finally {
+    req.off('aborted', onAborted);
+    res.off('close', onResClose);
   }
 });
 

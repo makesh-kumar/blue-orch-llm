@@ -1,5 +1,5 @@
-import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef, HostListener } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
+import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef, HostListener, Output, EventEmitter } from '@angular/core';
+import { forkJoin, of, Subscription } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ChatService, ChatMessage, ActiveTool } from '../../services/chat.service';
 import { LlmService, LlmRegistryEntry } from '../../services/llm.service';
@@ -9,9 +9,16 @@ import { UsageCalculatorService } from '../../services/usage-calculator.service'
 
 // ─── System Instruction Constants ───────────────────────────────────────────
 
-const SYSTEM_PROJECT_MODE = (workspacePath: string): string =>
-  `You are a Senior Systems Architect. Local Workspace: ${workspacePath}. ` +
-  `Use MCP tools to analyze and modify the codebase.`;
+const SYSTEM_PROJECT_MODE = (workspacePath: string, contextFiles: string[] = []): string => {
+  const base =
+    `You are a Senior Systems Architect. Local Workspace: ${workspacePath}. ` +
+    `Use MCP tools to analyze and modify the codebase.`;
+  if (contextFiles.length > 0) {
+    const fileList = contextFiles.map(f => `  - ${f}`).join('\n');
+    return base + `\nFocus specifically on these selected file(s):\n${fileList}`;
+  }
+  return base;
+};
 
 const SYSTEM_EXPERT_MODE =
   `You are a world-class Senior Software Engineer and Computer Science expert. ` +
@@ -36,6 +43,7 @@ interface McpConnectionView {
 })
 export class ChatComponent implements OnInit, AfterViewChecked {
   @ViewChild('chatBody') chatBodyRef!: ElementRef<HTMLDivElement>;
+  @Output() navigateToWorkspace = new EventEmitter<void>();
 
   // ── Sidebar
   providers: LlmRegistryEntry[] = [];
@@ -56,12 +64,13 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   isProjectModeActive = false;
 
   private shouldScroll = false;
+  private chatSub: Subscription | null = null;
 
   constructor(
     private chatService: ChatService,
     private llmService: LlmService,
     private mcpService: McpService,
-    private workspaceService: WorkspaceService,
+    public workspaceService: WorkspaceService,
     private usageCalc: UsageCalculatorService,
   ) {
     console.log(`[INIT] ${new Date().toISOString()} ChatComponent initialized`);
@@ -76,6 +85,13 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     if (this.shouldScroll) {
       this.scrollToBottom();
       this.shouldScroll = false;
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.chatSub) {
+      this.chatSub.unsubscribe();
+      this.chatSub = null;
     }
   }
 
@@ -190,7 +206,10 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   get systemInstruction(): string {
     if (this.isProjectModeActive) {
-      return SYSTEM_PROJECT_MODE(this.workspaceService.currentPath);
+      return SYSTEM_PROJECT_MODE(
+        this.workspaceService.currentPath,
+        this.workspaceService.contextFiles,
+      );
     }
     return SYSTEM_EXPERT_MODE;
   }
@@ -231,7 +250,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
     const activeTools = this.isProjectModeActive ? this.getActiveTools() : [];
 
-    this.chatService.send({
+    this.chatSub = this.chatService.send({
       message: text,
       providerId: this.selectedProviderId,
       activeTools,
@@ -251,16 +270,27 @@ export class ChatComponent implements OnInit, AfterViewChecked {
           turnCost,
         });
         this.isThinking = false;
+        this.chatSub = null;
         this.shouldScroll = true;
         console.log(`[SUCCESS] ${new Date().toISOString()} Reply received | toolsUsed: [${res.toolsUsed.join(', ')}] | turnCost: $${turnCost.toFixed(6)} | sessionCost: $${this.totalSessionCost.toFixed(6)}`);
       },
       error: (err) => {
         this.isThinking = false;
+        this.chatSub = null;
         const msg = err.error?.error ?? err.message ?? 'An unexpected error occurred.';
         this.showAlert(`Chat error: ${msg}`);
         console.log(`[ERROR] ${new Date().toISOString()} sendMessage failed | ${msg}`);
       },
     });
+  }
+
+  stopGeneration(): void {
+    if (!this.chatSub || !this.isThinking) return;
+    this.chatSub.unsubscribe();
+    this.chatSub = null;
+    this.isThinking = false;
+    this.showAlert('Response stopped by user.');
+    console.log(`[SUCCESS] ${new Date().toISOString()} ChatComponent: generation stopped by user`);
   }
 
   onEnter(event: KeyboardEvent): void {
@@ -324,5 +354,16 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       console.log(`[ERROR] ${new Date().toISOString()} Clipboard write failed | ${err.message}`);
       setTimeout(() => { btn.textContent = orig; }, 2000);
     });
+  }
+
+  truncatePath(path: string): string {
+    if (!path) return '—';
+    const sep = path.includes('/') ? '/' : '\\';
+    const parts = path.split(sep).filter(p => p.length > 0);
+    if (parts.length <= 4) return path;
+    const prefix = path.startsWith('/') ? '/' : '';
+    const head = parts.slice(0, 2).join(sep);
+    const tail = parts.slice(-2).join(sep);
+    return `${prefix}${head}${sep}…${sep}${tail}`;
   }
 }

@@ -9,16 +9,15 @@ import { ChatComponent } from '../chat/chat.component';
 export class DashboardComponent {
   @ViewChild(ChatComponent) private chatComp?: ChatComponent;
 
-  activeTab: 'mcp' | 'llm' | 'chat' = 'mcp';
+  activeTab: 'mcp' | 'llm' | 'chat' | 'workspace' = 'mcp';
 
   constructor() {
     console.log(`[INIT] ${new Date().toISOString()} DashboardComponent initialized`);
   }
 
-  setTab(tab: 'mcp' | 'llm' | 'chat'): void {
+  setTab(tab: 'mcp' | 'llm' | 'chat' | 'workspace'): void {
     this.activeTab = tab;
     if (tab === 'chat') {
-      // Refresh sidebar so newly added LLM/MCP entries are reflected immediately
       this.chatComp?.loadSidebar();
     }
   }

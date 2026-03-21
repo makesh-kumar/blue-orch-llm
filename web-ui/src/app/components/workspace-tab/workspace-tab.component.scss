@@ -1,0 +1,440 @@
+:host {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+// ── Outer layout ───────────────────────────────────────────────────────────────
+.ws-tab-wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+// ── Left tree panel ────────────────────────────────────────────────────────────
+.ws-tree-panel {
+  width: 300px;
+  min-width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  background: #fafbfc;
+  overflow: hidden;
+}
+
+.ws-path-bar {
+  flex-shrink: 0;
+  background: #f0f4ff;
+}
+
+.ws-path-input {
+  font-size: 0.78rem;
+  min-width: 0;
+}
+
+.ws-ctx-bar {
+  flex-shrink: 0;
+  background: #f8f9fa;
+  .btn-xs { font-size: 0.65rem; padding: 0 4px; }
+}
+
+.ws-tree-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.ws-legend {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+}
+
+// ── Tree nodes ─────────────────────────────────────────────────────────────────
+.ws-tree-node {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding-right: 6px;
+  gap: 3px;
+  cursor: default;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.07s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
+
+  &.is-active-root {
+    background: #e8f4fd;
+    border-left: 3px solid #0d6efd;
+  }
+
+  &.in-context-file {
+    background: #f0fdf4;
+    border-left: 3px solid #198754;
+    .node-label { color: #145c32; font-weight: 500; }
+    .node-icon  { color: #198754 !important; }
+  }
+
+  &.is-viewing {
+    background: #fffbea;
+    border-left: 3px solid #ffc107;
+    .node-label { color: #856404; font-weight: 600; }
+  }
+}
+
+.ws-node-file { cursor: pointer; }
+
+// ── Expand button ──────────────────────────────────────────────────────────────
+.btn-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #6c757d;
+  &:hover:not(:disabled) { background: #dee2e6; color: #0d6efd; }
+  &:disabled             { opacity: 0.5; cursor: default; }
+}
+
+.expand-icon {
+  font-size: 0.6rem;
+  transition: transform 0.13s;
+  &.expanded { transform: rotate(90deg); }
+}
+
+// ── Pin button ─────────────────────────────────────────────────────────────────
+.btn-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 0.1s;
+  &:hover { opacity: 1; background: #e8f0fe; }
+}
+
+.ws-tree-node.is-active-root .btn-pin { opacity: 1; }
+
+// ── Node parts ─────────────────────────────────────────────────────────────────
+.node-icon  { font-size: 0.82rem; flex-shrink: 0; }
+
+.node-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dir-label {
+  cursor: pointer;
+  &:hover { color: #0d6efd; text-decoration: underline; }
+}
+
+.active-root-icon { font-size: 0.72rem; }
+
+// ── Context checkbox ───────────────────────────────────────────────────────────
+.ctx-label {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.1s;
+  &:hover { opacity: 1; }
+}
+
+.ws-tree-node:has(.ctx-check:checked) .ctx-label { opacity: 1; }
+
+.ctx-check {
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  accent-color: #0d6efd;
+  border: 1.5px solid #6c757d !important;
+}
+
+// Force white background only when unchecked so the checkmark renders correctly
+.ctx-check:not(:checked) {
+  background-color: #fff !important;
+}
+
+// ── Right: Viewer panel ────────────────────────────────────────────────────────
+.ws-viewer-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.ws-viewer-empty {
+  flex: 1;
+  background: #f8f9fa;
+  color: #6c757d;
+}
+
+.ws-viewer-tabbar {
+  flex-shrink: 0;
+  min-height: 38px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  overflow-x: auto;
+}
+
+.ws-viewer-tab {
+  border-right: 1px solid #3c3c3c;
+  white-space: nowrap;
+}
+
+.active-viewer-tab {
+  background: #1e1e1e;
+}
+
+// ── Monaco fills remaining height ──────────────────────────────────────────────
+.ws-monaco-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ws-monaco-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: #1e1e1e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ws-monaco-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ws-monaco {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+// ngx-monaco-editor wraps content in a div — make it fill the flex space
+::ng-deep .ws-monaco > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+// ── New-file buttons in ctx bar ────────────────────────────────────────────────
+.btn-new-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #6c757d;
+  font-size: 0.82rem;
+  transition: background 0.1s, color 0.1s;
+  &:hover { background: #e2e6ea; color: #0d6efd; }
+}
+
+// ── New file inline input bar ──────────────────────────────────────────────────
+.ws-new-input-bar {
+  flex-shrink: 0;
+  background: #f0f4ff;
+  font-size: 0.8rem;
+}
+
+// ── Tabbar right-side controls ───────────────────────────────────────────────────
+.ws-tab-path {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.68rem;
+  padding: 0 8px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Consolas', monospace;
+}
+
+.ws-tab-controls {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+
+  .btn { font-size: 0.76rem; }
+  .badge { font-size: 0.65rem; }
+}
+
+.ws-tab-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 5px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #ccc;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: background 0.1s, color 0.1s;
+  &:hover { background: #3e3e42; color: #fff; }
+  &.active { background: rgba(13,110,253,0.15); color: #4da3ff; }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+.ws-tab-sep {
+  width: 1px;
+  height: 16px;
+  background: #444;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.ws-tab-font-size {
+  font-size: 0.72rem;
+  color: #aaa;
+  min-width: 18px;
+  text-align: center;
+  font-family: 'Consolas', monospace;
+  user-select: none;
+}
+
+// ── Light theme overrides ──────────────────────────────────────────────────────
+.ws-theme-light {
+  background: #fff;
+
+  .ws-monaco-loader  { background: #fff; }
+  .ws-viewer-tabbar  { background: #f3f3f3 !important; border-bottom-color: #ddd !important; }
+  .ws-viewer-tab     { background: #fff !important; color: #333 !important; }
+  .ws-statusbar      { background: #007acc; }
+  .active-viewer-tab { background: #fff !important; }
+  .ws-tab-icon-btn   { color: #555; &:hover { background: #e8e8e8; color: #333; } }
+  .ws-tab-path       { color: #999; }
+  .ws-tab-font-size  { color: #666; }
+  .ws-tab-sep        { background: #ddd; }
+}
+
+// ── Dirty dot in tab ───────────────────────────────────────────────────────────
+.dirty-dot {
+  color: #e2b04a;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+// ── Status bar ─────────────────────────────────────────────────────────────────
+.ws-statusbar {
+  flex-shrink: 0;
+  background: #007acc;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 12px;
+  font-size: 0.7rem;
+  font-family: 'Consolas', monospace;
+  gap: 0;
+  user-select: none;
+}
+
+.ws-statusbar-item {
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  &:hover { background: rgba(255,255,255,0.15); cursor: default; }
+}
+
+.ws-statusbar-spacer { flex: 1; }
+
+.ws-status-editing {
+  background: rgba(255,165,0,0.2);
+  color: #ffc107;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  &:hover { background: rgba(255,165,0,0.3); }
+}
+
+.ws-status-dirty {
+  color: #e2b04a;
+}
+
+.ws-statusbar-font {
+  gap: 4px;
+  cursor: default;
+  &:hover { background: rgba(255,255,255,0.15); }
+}
+
+.ws-sb-btn {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 3px;
+  line-height: 1;
+  font-size: 0.72rem;
+  border-radius: 3px;
+  &:hover { background: rgba(255,255,255,0.2); }
+}
+
+.ws-sb-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0 8px;
+  height: 22px;
+  font-size: 0.7rem;
+  font-family: 'Consolas', monospace;
+  &:hover { background: rgba(255,255,255,0.15); }
+}
+
+.ws-statusbar-sep {
+  opacity: 0.4;
+  padding: 0 2px;
+}

@@ -1,0 +1,342 @@
+<div class="ws-tab-wrapper">
+
+  <!-- ── Left: File Tree Panel ─────────────────────────────────────────────── -->
+  <div class="ws-tree-panel">
+
+    <!-- Path bar -->
+    <div class="ws-path-bar border-bottom d-flex align-items-center gap-2 px-3 py-2">
+      <button class="btn btn-sm btn-outline-secondary py-0 px-2 flex-shrink-0"
+              (click)="navigateToParent()"
+              [disabled]="treeRootPath === '/' || treeLoading"
+              title="Go up to parent folder">
+        <i class="bi bi-arrow-up"></i>
+      </button>
+      <input class="form-control form-control-sm font-monospace ws-path-input"
+             type="text"
+             [value]="pathInput"
+             (input)="pathInput = $any($event.target).value"
+             (keydown)="onPathKeydown($event)"
+             (blur)="applyPathInput()"
+             spellcheck="false"
+             [title]="treeRootPath">
+    </div>
+
+    <!-- Context summary + New file actions -->
+    <div class="ws-ctx-bar border-bottom px-3 py-1 d-flex align-items-center gap-2 small">
+      <i class="bi bi-folder2-open text-primary flex-shrink-0"></i>
+      <span class="text-muted text-truncate flex-1" [title]="activePath" style="font-size:0.72rem;">
+        Root: {{ activePath || '—' }}
+      </span>
+      <ng-container *ngIf="(workspaceService.contextFiles$ | async)?.length as fc">
+        <span class="badge bg-success d-flex align-items-center gap-1" style="font-size:0.68rem;">
+          <i class="bi bi-file-earmark-check"></i>{{ fc }} in context
+        </span>
+        <button class="btn btn-xs btn-outline-danger py-0 px-1"
+                (click)="resetContext()"
+                title="Reset context selection">
+          <i class="bi bi-x-circle"></i>
+        </button>
+      </ng-container>
+      <!-- New file / folder buttons -->
+      <button class="btn-new-item" (click)="showNewFileInput(treeRootPath, 'file')" title="New File">
+        <i class="bi bi-file-earmark-plus"></i>
+      </button>
+      <button class="btn-new-item" (click)="showNewFileInput(treeRootPath, 'directory')" title="New Folder">
+        <i class="bi bi-folder-plus"></i>
+      </button>
+    </div>
+
+    <!-- Inline new file / folder input -->
+    <div *ngIf="showNewInput" class="ws-new-input-bar border-bottom px-3 py-2">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi text-muted flex-shrink-0"
+           [class.bi-file-earmark-plus]="newInputType === 'file'"
+           [class.bi-folder-plus]="newInputType === 'directory'"></i>
+        <input #newFileInput
+               class="form-control form-control-sm font-monospace flex-1"
+               type="text"
+               [placeholder]="newInputType === 'file' ? 'filename.ts' : 'folder-name'"
+               [(ngModel)]="newInputName"
+               (keydown)="onNewInputKeydown($event)"
+               autofocus>
+        <button class="btn btn-sm btn-primary py-0 px-2" (click)="confirmNewFile()">
+          <i class="bi bi-check-lg"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2" (click)="cancelNewFile()">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div *ngIf="newInputError" class="text-danger mt-1" style="font-size:0.72rem;">
+        <i class="bi bi-exclamation-circle me-1"></i>{{ newInputError }}
+      </div>
+      <div class="text-muted mt-1" style="font-size:0.68rem;">In: {{ newInputDir }}</div>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="treeLoading" class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+      <p class="small mb-0">Loading…</p>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="!treeLoading && treeError" class="alert alert-warning m-3 py-2 small">
+      <i class="bi bi-exclamation-triangle me-1"></i>{{ treeError }}
+    </div>
+
+    <!-- CDK Tree -->
+    <div *ngIf="!treeLoading && !treeError" class="ws-tree-body">
+
+      <div *ngIf="flatNodes.length === 0" class="text-center text-muted py-5 small">
+        <i class="bi bi-folder-x d-block fs-3 mb-2 opacity-50"></i>Empty folder
+      </div>
+
+      <cdk-tree *ngIf="flatNodes.length > 0"
+                [dataSource]="nodesData$"
+                [treeControl]="treeControl">
+
+        <!-- File leaf -->
+        <cdk-tree-node *cdkTreeNodeDef="let node"
+                       class="ws-tree-node ws-node-file"
+                       [class.in-context-file]="node.inContext"
+                       [class.is-viewing]="viewerFile === node"
+                       [style.padding-left.px]="node.level * 16 + 28"
+                       (click)="openFile(node)">
+          <i class="node-icon bi"
+             [class.bi-file-earmark-code]="isCodeFile(node.name)"
+             [class.bi-file-earmark-text]="!isCodeFile(node.name)"
+             [class.text-info]="isCodeFile(node.name)"
+             [class.text-secondary]="!isCodeFile(node.name)"></i>
+          <span class="node-label small text-truncate flex-1" [title]="node.path">{{ node.name }}</span>
+          <label class="ctx-label flex-shrink-0" title="Add to AI context" (click)="$event.stopPropagation()">
+            <input type="checkbox"
+                   class="form-check-input ctx-check"
+                   [checked]="node.inContext"
+                   (change)="toggleContext($event, node)">
+          </label>
+        </cdk-tree-node>
+
+        <!-- Directory branch -->
+        <cdk-tree-node *cdkTreeNodeDef="let node; when: hasChild"
+                       class="ws-tree-node ws-node-dir"
+                       [class.is-active-root]="node.path === activePath"
+                       [style.padding-left.px]="node.level * 16 + 4">
+
+          <button class="btn-expand"
+                  (click)="toggleNode(node)"
+                  [disabled]="node.loading">
+            <span *ngIf="node.loading" class="spinner-border spinner-border-sm text-primary"
+                  role="status" style="width:11px;height:11px;"></span>
+            <i *ngIf="!node.loading"
+               class="bi bi-chevron-right expand-icon"
+               [class.expanded]="isExpanded(node)"></i>
+          </button>
+
+          <i class="node-icon text-warning bi"
+             [class.bi-folder-fill]="!isExpanded(node)"
+             [class.bi-folder2-open]="isExpanded(node)"></i>
+
+          <span class="node-label small text-truncate flex-1 dir-label"
+                [title]="'Open: ' + node.path"
+                (click)="navigateInto(node)">{{ node.name }}</span>
+
+          <button class="btn-pin flex-shrink-0"
+                  (click)="$event.stopPropagation(); setAsRoot(node)"
+                  [title]="node.path === activePath ? 'Active workspace root' : 'Set as workspace root'">
+            <i class="bi active-root-icon"
+               [class.bi-pin-fill]="node.path === activePath"
+               [class.text-primary]="node.path === activePath"
+               [class.bi-pin]="node.path !== activePath"
+               [class.text-muted]="node.path !== activePath"></i>
+          </button>
+
+        </cdk-tree-node>
+
+      </cdk-tree>
+    </div>
+
+    <!-- Legend -->
+    <div class="ws-legend border-top px-3 py-1 d-flex align-items-center gap-3 small text-muted bg-light">
+      <span><i class="bi bi-chevron-right me-1"></i>Expand</span>
+      <span><i class="bi bi-folder-fill text-warning me-1"></i>Open</span>
+      <span><i class="bi bi-pin text-primary me-1"></i>Set Root</span>
+      <span><i class="bi bi-file-earmark-plus text-success me-1"></i>New File/Folder: top bar ⬆</span>
+    </div>
+
+  </div>
+
+  <!-- ── Right: Monaco Viewer ──────────────────────────────────────────────────────── -->
+  <div class="ws-viewer-panel" [class.ws-theme-light]="activeTheme === 'vs'">
+
+    <!-- Viewer placeholder -->
+    <div *ngIf="!viewerFile" class="ws-viewer-empty d-flex flex-column align-items-center justify-content-center text-muted">
+      <i class="bi bi-file-earmark-code d-block fs-1 mb-3 opacity-25"></i>
+      <p class="fw-semibold mb-1">No file open</p>
+      <p class="small mb-0">Click any file in the tree to view its content here</p>
+    </div>
+
+    <!-- Viewer loading -->
+    <div *ngIf="viewerFile && viewerLoading" class="ws-viewer-empty d-flex flex-column align-items-center justify-content-center text-muted">
+      <div class="spinner-border text-primary mb-3" role="status"></div>
+      <p class="small mb-0">Loading {{ viewerFile.name }}…</p>
+    </div>
+
+    <!-- Viewer error -->
+    <div *ngIf="viewerFile && !viewerLoading && viewerError"
+         class="ws-viewer-empty d-flex flex-column align-items-center justify-content-center">
+      <i class="bi bi-exclamation-triangle-fill text-warning d-block fs-2 mb-3"></i>
+      <p class="text-danger small mb-2">{{ viewerError }}</p>
+      <button class="btn btn-sm btn-outline-secondary" (click)="closeViewer()">Close</button>
+    </div>
+
+    <!-- Viewer tab bar: shown only when a file is open + ready -->
+    <div class="ws-viewer-tabbar d-flex align-items-center border-bottom bg-dark px-2"
+         *ngIf="viewerFile && !viewerLoading && !viewerError">
+      <div class="ws-viewer-tab d-flex align-items-center gap-2 px-3 py-2 text-light active-viewer-tab">
+        <i class="bi bi-file-earmark-code text-info" style="font-size:0.8rem;"></i>
+        <!-- dirty dot -->
+        <span *ngIf="isDirty" class="dirty-dot" title="Unsaved changes">●</span>
+        <span class="small" style="font-size:0.8rem;">{{ viewerFile.name }}</span>
+
+        <!-- Context toggle inside viewer tab -->
+        <label class="ctx-label ms-2" title="Add to AI context" (click)="$event.stopPropagation()">
+          <input type="checkbox"
+                 class="form-check-input ctx-check"
+                 [checked]="viewerFile.inContext"
+                 (change)="toggleContext($event, viewerFile)">
+        </label>
+        <span *ngIf="viewerFile.inContext" class="badge bg-success ms-1" style="font-size:0.62rem;">In Context</span>
+
+        <button class="btn-close btn-close-white ms-2"
+                style="width:10px;height:10px;"
+                (click)="closeViewer()"></button>
+      </div>
+
+      <!-- File path (middle, truncated) -->
+      <span class="ws-tab-path" [title]="viewerFile.path">{{ viewerFile.path }}</span>
+
+      <!-- Right-side controls -->
+      <div class="ws-tab-controls">
+
+        <!-- Edit / Save / Discard -->
+        <ng-container *ngIf="!isEditing">
+          <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                  (click)="toggleEdit()" title="Edit file">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>
+        </ng-container>
+        <ng-container *ngIf="isEditing">
+          <button class="btn btn-sm py-0 px-2"
+                  [class.btn-success]="!isSaving"
+                  [class.btn-secondary]="isSaving"
+                  [disabled]="isSaving"
+                  (click)="saveFile()" title="Save (Cmd/Ctrl+S)">
+            <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-1" role="status"></span>
+            <i *ngIf="!isSaving" class="bi bi-floppy me-1"></i>
+            {{ isSaving ? 'Saving…' : 'Save' }}
+          </button>
+          <button class="ws-tab-icon-btn"
+                  [disabled]="isSaving"
+                  (click)="discardChanges()" title="Discard changes">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
+          <span class="badge bg-warning text-dark" style="font-size:0.65rem;">EDITING</span>
+        </ng-container>
+        <span *ngIf="saveNotify" class="text-success" style="font-size:0.8rem;">
+          <i class="bi bi-check-circle-fill"></i>
+        </span>
+
+        <div class="ws-tab-sep"></div>
+
+        <!-- Word wrap toggle -->
+        <button class="ws-tab-icon-btn"
+                [class.active]="wordWrap"
+                (click)="toggleWordWrap()"
+                title="Word wrap {{ wordWrap ? 'On' : 'Off' }}">
+          <i class="bi bi-text-wrap"></i>
+        </button>
+
+        <!-- Minimap toggle -->
+        <button class="ws-tab-icon-btn"
+                [class.active]="minimapOn"
+                (click)="toggleMinimap()"
+                title="Minimap {{ minimapOn ? 'On' : 'Off' }}">
+          <i class="bi bi-map"></i>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Monaco: always in DOM so (onInit) fires once — content set via editor.setValue() -->
+    <div class="ws-monaco-wrap" [style.display]="viewerFile ? 'flex' : 'none'">
+      <!-- Loading overlay: shown while Monaco initialises (first load) or file is fetching -->
+      <div class="ws-monaco-loader" *ngIf="viewerFile && (viewerLoading || !monacoReady || !contentReady)">
+        <div class="ws-monaco-loader-inner">
+          <div class="spinner-border text-primary" role="status" style="width:1.5rem;height:1.5rem;"></div>
+          <span class="small text-muted mt-2">
+            {{ !monacoReady ? 'Initialising editor…' : 'Loading ' + viewerFile.name + '…' }}
+          </span>
+        </div>
+      </div>
+      <ngx-monaco-editor class="ws-monaco"
+                       [options]="editorOptions"
+                       (onInit)="onMonacoInit($event)">
+      </ngx-monaco-editor>
+    </div>
+
+    <!-- Status bar -->
+    <div class="ws-statusbar" *ngIf="viewerFile && !viewerLoading && !viewerError">
+      <!-- Left: cursor + language -->
+      <span class="ws-statusbar-item">Ln {{ cursorLine }}, Col {{ cursorCol }}</span>
+      <span class="ws-statusbar-sep">|</span>
+      <span class="ws-statusbar-item">{{ viewerFile ? langFromName(viewerFile.name) : '' }}</span>
+
+      <!-- Edit / dirty indicators -->
+      <ng-container *ngIf="isEditing">
+        <span class="ws-statusbar-sep">|</span>
+        <span class="ws-statusbar-item ws-status-editing">
+          <i class="bi bi-pencil-fill" style="font-size:0.6rem;"></i> EDITING
+        </span>
+      </ng-container>
+      <ng-container *ngIf="isDirty">
+        <span class="ws-statusbar-sep">|</span>
+        <span class="ws-statusbar-item ws-status-dirty">
+          <i class="bi bi-circle-fill" style="font-size:0.45rem;"></i> Unsaved
+        </span>
+      </ng-container>
+
+      <!-- Spacer pushes right section to the end -->
+      <span class="ws-statusbar-spacer"></span>
+
+      <!-- Font size changer -->
+      <span class="ws-statusbar-item ws-statusbar-font">
+        <button class="ws-sb-btn" (click)="setFontSize(-1)" title="Decrease font size">A<sup style="font-size:0.55rem;">−</sup></button>
+        <span>{{ fontSize }}px</span>
+        <button class="ws-sb-btn" (click)="setFontSize(1)" title="Increase font size">A<sup style="font-size:0.55rem;">+</sup></button>
+      </span>
+
+      <span class="ws-statusbar-sep">|</span>
+
+      <!-- Theme picker -->
+      <div class="dropdown">
+        <button class="ws-sb-dropdown-btn" type="button" data-bs-toggle="dropdown" title="Theme">
+          <i class="bi bi-palette" style="font-size:0.7rem;"></i>
+          <span>{{ activeTheme === 'vs-dark' ? 'Dark' : activeTheme === 'vs' ? 'Light' : 'HC' }}</span>
+          <i class="bi bi-chevron-up" style="font-size:0.5rem; opacity:0.6;"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+          <li><button class="dropdown-item small" [class.active]="activeTheme==='vs-dark'" (click)="setTheme('vs-dark')">
+            <i class="bi bi-moon-fill me-2"></i>Dark
+          </button></li>
+          <li><button class="dropdown-item small" [class.active]="activeTheme==='vs'" (click)="setTheme('vs')">
+            <i class="bi bi-sun-fill me-2"></i>Light
+          </button></li>
+          <li><button class="dropdown-item small" [class.active]="activeTheme==='hc-black'" (click)="setTheme('hc-black')">
+            <i class="bi bi-circle-half me-2"></i>High Contrast
+          </button></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+</div>
