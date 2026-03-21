@@ -103,10 +103,11 @@ export class WorkspaceService {
   get systemContext(): string {
     const path = this.currentPath;
     return (
-      `You are an expert developer assistant. ` +
-      `The current local workspace is: ${path}. ` +
-      `All file operations should default to this directory. ` +
-      `If the user mentions "this folder" or "my code," they are referring to this path.`
+      `You are an expert developer assistant.\n` +
+      `The current local workspace is exactly: ${JSON.stringify(path)}.\n` +
+      `Treat that workspace path as a literal string and preserve spaces exactly as written.\n` +
+      `All file operations should default to this directory.\n` +
+      `If the user mentions "this folder" or "my code," they are referring to this exact path.`
     );
   }
 

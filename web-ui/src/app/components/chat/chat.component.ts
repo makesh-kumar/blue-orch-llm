@@ -9,15 +9,27 @@ import { UsageCalculatorService } from '../../services/usage-calculator.service'
 
 // ─── System Instruction Constants ───────────────────────────────────────────
 
+const quotePromptPath = (path: string): string => JSON.stringify(path ?? '');
+
 const SYSTEM_PROJECT_MODE = (workspacePath: string, contextFiles: string[] = []): string => {
-  const base =
-    `You are a Senior Systems Architect. Local Workspace: ${workspacePath}. ` +
-    `Use MCP tools to analyze and modify the codebase.`;
+  const base = [
+    'You are a Senior Systems Architect.',
+    'Use MCP tools to analyze and modify the codebase.',
+    '',
+    'Workspace rules:',
+    `- Active workspace root path: ${quotePromptPath(workspacePath)}`,
+    '- Treat the workspace path as an exact literal string.',
+    '- Preserve spaces exactly as written in folder and file names.',
+    '- Never rewrite, shorten, normalize, or split paths on spaces.',
+    '- When calling filesystem tools, prefer absolute paths under the active workspace root.',
+  ].join('\n');
+
   if (contextFiles.length > 0) {
-    const fileList = contextFiles.map(f => `  - ${f}`).join('\n');
-    return base + `\nFocus specifically on these selected file(s):\n${fileList}`;
+    const fileList = contextFiles.map(f => `- ${quotePromptPath(f)}`).join('\n');
+    return `${base}\n\nFocus specifically on these selected file(s):\n${fileList}`;
   }
-  return base;
+
+  return `${base}\n\nIf the user refers to the workspace, project, or current folder, they mean that exact root path.`;
 };
 
 const SYSTEM_EXPERT_MODE =
