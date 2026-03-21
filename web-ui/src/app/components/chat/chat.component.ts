@@ -151,7 +151,10 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   providerIconClass(provider: string): string {
-    const icons: Record<string, string> = { gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu' };
+    const icons: Record<string, string> = {
+      gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu',
+      ollama: 'bi-hdd-stack', lmstudio: 'bi-pc-display',
+    };
     return icons[provider] ?? 'bi-box';
   }
 

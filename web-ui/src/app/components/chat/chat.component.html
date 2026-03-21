@@ -24,6 +24,7 @@
             <ng-container *ngSwitchCase="'gemini'">Gemini</ng-container>
             <ng-container *ngSwitchCase="'openai'">OpenAI</ng-container>
             <ng-container *ngSwitchCase="'claude'">Claude</ng-container>
+            <ng-container *ngSwitchCase="'lmstudio'">LM Studio</ng-container>
             <ng-container *ngSwitchDefault>{{ p.provider }}</ng-container>
           </ng-container>
           — {{ p.model }}
@@ -92,7 +93,7 @@
   <div class="chat-main">
 
     <!-- Chat Header -->
-    <div class="chat-header border-bottom px-4 py-2 d-flex align-items-center gap-5 flex-shrink-0">
+    <div class="chat-header border-bottom px-2 py-0 d-flex align-items-center gap-1 flex-shrink-0">
       <div class="d-flex align-items-center gap-1">
               <i class="bi bi-chat-dots-fill text-primary"></i>
       <span class="fw-semibold">Chat</span>

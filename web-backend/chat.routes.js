@@ -320,6 +320,79 @@ async function handleOllama({ baseUrl, model, message, history, toolDefs, execut
   return { text, standardizedUsage };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleLmStudio({ baseUrl, model, message, history, toolDefs, executeTool, toolsUsed, systemContext }) {
+  const startMs = Date.now();
+  console.log(`[INIT] ${ts()} handleLmStudio() | model: ${model}`);
+  const OpenAI = (await import('openai')).default;
+  const lmBase = (baseUrl ?? 'http://localhost:1234').replace(/\/$/, '');
+  const openai = new OpenAI({ baseURL: `${lmBase}/v1`, apiKey: 'lm-studio' });
+
+  const tools = toolDefs.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description ?? '',
+      parameters: t.inputSchema ?? { type: 'object', properties: {} },
+    },
+  }));
+
+  const messages = [
+    ...(systemContext ? [{ role: 'system', content: systemContext }] : []),
+    ...history.map(h => ({ role: h.role, content: h.content })),
+    { role: 'user', content: message },
+  ];
+
+  const callLmStudio = async (payload) => {
+    try {
+      return await openai.chat.completions.create(payload);
+    } catch (err) {
+      const isRefused = err.cause?.code === 'ECONNREFUSED' || err.code === 'ECONNREFUSED';
+      if (isRefused) throw new Error('LM Studio Server Not Found. Enable Developer Mode and Start Server in LM Studio.');
+      throw err;
+    }
+  };
+
+  let response = await callLmStudio({
+    model,
+    messages,
+    ...(tools.length > 0 && { tools, tool_choice: 'auto' }),
+  });
+
+  // ── Agentic tool loop ────────────────────────────────────────────────────────
+  while (response.choices[0].finish_reason === 'tool_calls') {
+    const assistantMsg = response.choices[0].message;
+    messages.push(assistantMsg);
+
+    for (const tc of assistantMsg.tool_calls) {
+      toolsUsed.push(tc.function.name);
+      console.log(`[INIT] ${ts()} LMStudio → tool: ${tc.function.name}`);
+      let content;
+      try {
+        const args = JSON.parse(tc.function.arguments);
+        const raw = await executeTool(tc.function.name, args);
+        content = extractToolText(raw);
+        console.log(`[SUCCESS] ${ts()} Tool "${tc.function.name}" returned`);
+      } catch (err) {
+        content = JSON.stringify({ error: err.message });
+        console.log(`[ERROR] ${ts()} Tool "${tc.function.name}" failed: ${err.message}`);
+      }
+      messages.push({ role: 'tool', tool_call_id: tc.id, content });
+    }
+
+    response = await callLmStudio({ model, messages, tools, tool_choice: 'auto' });
+  }
+
+  const text = response.choices[0].message.content ?? '';
+  const latencyMs = Date.now() - startMs;
+  // LM Studio appends a `stats` object alongside the standard `usage` field
+  const stats = response.stats ?? null;
+  const standardizedUsage = mapProviderUsage(response.usage, 'lmstudio', { model, latencyMs, stats });
+  console.log(`[SUCCESS] ${ts()} handleLmStudio() complete | latencyMs: ${latencyMs}`);
+  return { text, standardizedUsage };
+}
+
 // ─── POST /api/chat/send ──────────────────────────────────────────────────────
 // Body: { message, providerId, activeTools, systemContext?, activeWorkspacePath? }
 router.post('/send', async (req, res) => {
@@ -382,6 +455,7 @@ router.post('/send', async (req, res) => {
     else if (provider === 'openai') result = await handleOpenAI(commonArgs);
     else if (provider === 'claude') result = await handleClaude(commonArgs);
     else if (provider === 'ollama') result = await handleOllama({ ...commonArgs, baseUrl });
+    else if (provider === 'lmstudio') result = await handleLmStudio({ ...commonArgs, baseUrl });
     else return res.status(400).json({ error: `Unknown provider: "${provider}"` });
 
     const reply             = result.text;

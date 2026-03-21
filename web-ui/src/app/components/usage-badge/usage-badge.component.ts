@@ -19,12 +19,21 @@ export class UsageBadgeComponent {
     return this.usage?.provider === 'ollama';
   }
 
+  get isLmStudio(): boolean {
+    return this.usage?.provider === 'lmstudio';
+  }
+
+  get isLocalProvider(): boolean {
+    return this.isOllama || this.isLmStudio;
+  }
+
   get providerIconClass(): string {
     const icons: Record<string, string> = {
-      gemini: 'bi-google',
-      openai: 'bi-robot',
-      claude: 'bi-cpu',
-      ollama: 'bi-hdd-stack',
+      gemini:   'bi-google',
+      openai:   'bi-robot',
+      claude:   'bi-cpu',
+      ollama:   'bi-hdd-stack',
+      lmstudio: 'bi-pc-display',
     };
     return `bi ${icons[this.usage?.provider ?? ''] ?? 'bi-box'}`;
   }
@@ -53,5 +62,9 @@ export class UsageBadgeComponent {
     if (!this.usage) return '0 tok/s';
     const tps = this.usageCalc.calcTps(this.usage);
     return `${tps} tok/s`;
+  }
+
+  get hasHardwareTps(): boolean {
+    return this.isLmStudio && (this.usage?.tokensPerSecond ?? 0) > 0;
   }
 }

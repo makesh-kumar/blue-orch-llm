@@ -20,23 +20,45 @@
             <option value="openai">OpenAI</option>
             <option value="claude">Claude (Anthropic)</option>
             <option value="ollama">Ollama (Local)</option>
+            <option value="lmstudio">LM Studio (Local)</option>
           </select>
           <div class="invalid-feedback">Please select a provider.</div>
         </div>
 
-        <!-- Base URL (Ollama only) -->
-        <div class="mb-2" *ngIf="isOllamaProvider">
-          <label class="form-label fw-semibold small mb-1">Base URL</label>
+        <!-- Base URL (local providers: Ollama & LM Studio) -->
+        <div class="mb-2" *ngIf="isLocalProvider">
+          <label class="form-label fw-semibold small mb-1">Server URL</label>
           <input type="text"
                  class="form-control font-monospace"
                  formControlName="baseUrl"
-                 placeholder="http://localhost:11434">
-          <div class="form-text text-muted">Default: http://localhost:11434</div>
+                 [placeholder]="isLmStudioProvider ? 'http://localhost:1234' : 'http://localhost:11434'">
+          <div class="form-text text-muted">
+            Default: {{ isLmStudioProvider ? 'http://localhost:1234' : 'http://localhost:11434' }}
+          </div>
         </div>
 
         <!-- Model -->
         <div class="mb-2">
           <label class="form-label fw-semibold small mb-1">Model</label>
+
+          <!-- LM Studio: Fetch button + status -->
+          <div *ngIf="isLmStudioProvider" class="d-flex gap-2 mb-1">
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary px-1 py-2"
+                    (click)="fetchLmStudioModels()"
+                    [disabled]="lmStudioFetchStatus === 'fetching'">
+              <span *ngIf="lmStudioFetchStatus === 'fetching'"
+                    class="spinner-border spinner-border-sm me-1" role="status"></span>
+              <i *ngIf="lmStudioFetchStatus !== 'fetching'" class="bi bi-cloud-download me-1"></i>
+              {{ lmStudioFetchStatus === 'fetching' ? 'Fetching...' : 'Fetch Loaded Models' }}
+            </button>
+            <span *ngIf="lmStudioFetchStatus === 'error'" class="small text-danger align-self-center">
+              <i class="bi bi-exclamation-circle me-1"></i>Server not running
+            </span>
+            <span *ngIf="lmStudioFetchStatus === 'done'" class="small text-success align-self-center">
+              <i class="bi bi-check-circle me-1"></i>{{ lmStudioModels.length }} model(s) loaded
+            </span>
+          </div>
 
           <!-- Ollama: Fetch button + status -->
           <div *ngIf="isOllamaProvider" class="d-flex gap-2 mb-1">
@@ -46,8 +68,8 @@
                     [disabled]="ollamaFetchStatus === 'fetching'">
               <span *ngIf="ollamaFetchStatus === 'fetching'"
                     class="spinner-border spinner-border-sm me-1" role="status"></span>
-              <i *ngIf="ollamaFetchStatus !== 'fetching'" class="bi bi-clouddownload me-1"></i>
-              {{ ollamaFetchStatus === 'fetching' ? 'Fetching...' : 'Fetch Models' }}
+              <i *ngIf="ollamaFetchStatus !== 'fetching'" class="bi bi-cloud-download me-1"></i>
+              {{ ollamaFetchStatus === 'fetching' ? 'Fetching...' : 'Fetch Loaded Models' }}
             </button>
             <span *ngIf="ollamaFetchStatus === 'error'" class="small text-danger align-self-center">
               <i class="bi bi-exclamation-circle me-1"></i>Could not reach Ollama
@@ -78,8 +100,8 @@
           <div class="invalid-feedback">Please enter a custom model ID.</div>
         </div>
 
-        <!-- API Key (hidden for Ollama) -->
-        <div class="mb-4" *ngIf="!isOllamaProvider">
+        <!-- API Key (hidden for Ollama and LM Studio) -->
+        <div class="mb-4" *ngIf="!isLocalProvider">
           <label class="form-label fw-semibold small mb-1">API Key</label>
           <input type="password"
                  class="form-control font-monospace"
@@ -122,6 +144,13 @@
             </span>
           </div>
           <i class="bi bi-exclamation-circle me-1"></i>{{ verifyError }}
+          <!-- LM Studio hint -->
+          <div *ngIf="isLmStudioProvider" class="mt-2 pt-2 border-top border-danger-subtle">
+            <i class="bi bi-info-circle me-1 text-danger"></i>
+            <strong>Hint:</strong> In LM Studio, go to
+            <em>Settings &rarr; Developer</em>, enable <strong>Developer Mode</strong>,
+            then open the <strong>Developer</strong> tab and click <strong>Start Server</strong>.
+          </div>
         </div>
 
       </div>
@@ -164,7 +193,8 @@
                 <span class="d-flex align-items-center gap-2">
                   <i class="bi text-primary" [ngClass]="providerIconClass(entry.provider)"></i>
                   <span class="fw-semibold">{{ providerLabel(entry.provider) }}</span>
-                  <span *ngIf="entry.provider === 'ollama'" class="badge bg-secondary">Local</span>
+                  <span *ngIf="entry.provider === 'ollama' || entry.provider === 'lmstudio'"
+                        class="badge bg-secondary">Local</span>
                 </span>
               </td>
               <!-- Model -->

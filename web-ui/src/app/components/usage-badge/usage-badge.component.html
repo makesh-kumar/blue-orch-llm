@@ -7,8 +7,8 @@
 
   <span class="badge-divider">|</span>
 
-  <!-- Cost (non-Ollama) or Speed (Ollama) -->
-  <ng-container *ngIf="!isOllama">
+  <!-- Cost (cloud providers) or Speed (local providers) -->
+  <ng-container *ngIf="!isLocalProvider">
     <span class="badge-stat badge-cost">
       <i class="bi bi-currency-dollar me-1 text-primary"></i>
       <span class="label">Cost:</span>
@@ -16,12 +16,21 @@
     </span>
   </ng-container>
 
-  <ng-container *ngIf="isOllama">
+  <ng-container *ngIf="isLocalProvider">
     <span class="badge-stat badge-speed">
       <i class="bi bi-speedometer2 me-1 text-success"></i>
       <span class="label">Speed:</span>
       <span class="value fw-semibold">{{ tpsDisplay }}</span>
     </span>
+    <!-- Hardware-reported TPS indicator for LM Studio -->
+    <ng-container *ngIf="hasHardwareTps">
+      <span class="badge-divider">|</span>
+      <span class="badge-stat">
+        <i class="bi bi-gpu-card me-1 text-info"></i>
+        <span class="label">HW:</span>
+        <span class="value text-info">{{ usage?.tokensPerSecond | number:'1.1-1' }} tok/s</span>
+      </span>
+    </ng-container>
   </ng-container>
 
   <span class="badge-divider">|</span>

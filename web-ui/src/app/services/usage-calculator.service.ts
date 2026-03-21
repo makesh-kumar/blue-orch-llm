@@ -46,10 +46,10 @@ export class UsageCalculatorService {
 
     let cost = 0;
 
-    if (provider === 'ollama') {
-      // ── Ollama — always free (local inference) ──────────────────────────
+    if (provider === 'ollama' || provider === 'lmstudio') {
+      // ── Local inference (Ollama / LM Studio) — always free ──────────────
       cost = 0;
-      console.log(`[SUCCESS] ${new Date().toISOString()} calculateCost() Ollama | cost: $0`);
+      console.log(`[SUCCESS] ${new Date().toISOString()} calculateCost() ${provider} | cost: $0`);
 
     } else if (provider === 'openai') {
       // ── GPT-5.4 — tier doubles when total > 270k ────────────────────────
@@ -91,13 +91,30 @@ export class UsageCalculatorService {
   }
 
   /**
-   * Calculate tokens-per-second for Ollama responses.
+   * Calculate tokens-per-second for local inference responses.
+   * For LM Studio: uses the hardware-reported tokensPerSecond if available.
+   * For Ollama: derives from output tokens / latency.
    * Returns 0 for all other providers or if latency is unavailable.
    */
   calcTps(usage: StandardizedUsage): number {
-    if (!usage || usage.provider !== 'ollama' || usage.latencyMs <= 0) return 0;
+    if (!usage) return 0;
+    if (usage.provider === 'lmstudio') {
+      if (usage.tokensPerSecond != null && usage.tokensPerSecond > 0) {
+        const tps = Math.round(usage.tokensPerSecond);
+        console.log(`[SUCCESS] ${new Date().toISOString()} calcTps() LM Studio (hardware) | ${tps} tok/s`);
+        return tps;
+      }
+      // Fall back to derived value
+      if (usage.latencyMs > 0) {
+        const tps = Math.round(usage.output / (usage.latencyMs / 1000));
+        console.log(`[SUCCESS] ${new Date().toISOString()} calcTps() LM Studio (derived) | ${tps} tok/s`);
+        return tps;
+      }
+      return 0;
+    }
+    if (usage.provider !== 'ollama' || usage.latencyMs <= 0) return 0;
     const tps = Math.round(usage.output / (usage.latencyMs / 1000));
-    console.log(`[SUCCESS] ${new Date().toISOString()} calcTps() | ${usage.output} tokens / ${usage.latencyMs}ms = ${tps} tok/s`);
+    console.log(`[SUCCESS] ${new Date().toISOString()} calcTps() Ollama | ${usage.output} tokens / ${usage.latencyMs}ms = ${tps} tok/s`);
     return tps;
   }
 

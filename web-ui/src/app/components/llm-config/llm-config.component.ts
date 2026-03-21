@@ -20,8 +20,9 @@ const MODEL_MAP: Record<string, { label: string; value: string }[]> = {
   claude: [
     { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20241022' },
     { label: 'Other',             value: 'other' },
-  ],
-};
+  ],  lmstudio: [
+    { label: 'Other (Enter Model ID)', value: 'other' },
+  ],};
 
 @Component({
   selector: 'app-llm-config',
@@ -36,6 +37,10 @@ export class LlmConfigComponent implements OnInit {
   // ── Ollama
   ollamaModels: { name: string; size: number }[] = [];
   ollamaFetchStatus: 'idle' | 'fetching' | 'done' | 'error' = 'idle';
+
+  // ── LM Studio
+  lmStudioModels: { id: string }[] = [];
+  lmStudioFetchStatus: 'idle' | 'fetching' | 'done' | 'error' = 'idle';
 
   // ── Verify status
   verifyStatus: 'idle' | 'verifying' | 'success' | 'error' = 'idle';
@@ -87,10 +92,17 @@ export class LlmConfigComponent implements OnInit {
     this.verifyError = '';
 
     const apiKeyCtrl = this.llmForm.get('apiKey')!;
-    if (provider === 'ollama') {
+    if (provider === 'ollama' || provider === 'lmstudio') {
       apiKeyCtrl.clearValidators();
-      this.ollamaModels = [];
-      this.ollamaFetchStatus = 'idle';
+      if (provider === 'ollama') {
+        this.llmForm.patchValue({ baseUrl: 'http://localhost:11434' });
+        this.ollamaModels = [];
+        this.ollamaFetchStatus = 'idle';
+      } else {
+        this.llmForm.patchValue({ baseUrl: 'http://localhost:1234' });
+        this.lmStudioModels = [];
+        this.lmStudioFetchStatus = 'idle';
+      }
     } else {
       apiKeyCtrl.setValidators([Validators.required]);
     }
@@ -106,6 +118,14 @@ export class LlmConfigComponent implements OnInit {
     return this.llmForm.get('provider')!.value === 'ollama';
   }
 
+  get isLmStudioProvider(): boolean {
+    return this.llmForm.get('provider')!.value === 'lmstudio';
+  }
+
+  get isLocalProvider(): boolean {
+    return this.isOllamaProvider || this.isLmStudioProvider;
+  }
+
   // ── Fetch Ollama models ────────────────────────────────────────────────────
   fetchOllamaModels(): void {
     const baseUrl = (this.llmForm.get('baseUrl')!.value as string).trim() || 'http://localhost:11434';
@@ -114,7 +134,10 @@ export class LlmConfigComponent implements OnInit {
     this.llmService.fetchOllamaModels(baseUrl).subscribe({
       next: (res) => {
         this.ollamaModels = res.models;
-        this.modelOptions = res.models.map(m => ({ label: m.name, value: m.name }));
+        this.modelOptions = [
+          ...res.models.map(m => ({ label: m.name, value: m.name })),
+          { label: 'Other (Enter Model ID)', value: 'other' },
+        ];
         this.ollamaFetchStatus = 'done';
         console.log(`[SUCCESS] ${new Date().toISOString()} Ollama models fetched | ${res.models.length} models`);
       },
@@ -125,14 +148,45 @@ export class LlmConfigComponent implements OnInit {
     });
   }
 
+  // ── Fetch LM Studio models ─────────────────────────────────────────────────
+  fetchLmStudioModels(): void {
+    const baseUrl = (this.llmForm.get('baseUrl')!.value as string).trim() || 'http://localhost:1234';
+    this.lmStudioFetchStatus = 'fetching';
+    console.log(`[INIT] ${new Date().toISOString()} fetchLmStudioModels() | baseUrl: ${baseUrl}`);
+    this.llmService.fetchLmStudioModels(baseUrl).subscribe({
+      next: (res) => {
+        this.lmStudioModels = res.models;
+        this.modelOptions = [
+          ...res.models.map(m => ({ label: m.id, value: m.id })),
+          { label: 'Other (Enter Model ID)', value: 'other' },
+        ];
+        if (res.models.length === 0) {
+          this.modelOptions = [{ label: 'Other (Enter Model ID)', value: 'other' }];
+        }
+        this.lmStudioFetchStatus = 'done';
+        console.log(`[SUCCESS] ${new Date().toISOString()} LM Studio models fetched | ${res.models.length} models`);
+      },
+      error: (err) => {
+        this.lmStudioFetchStatus = 'error';
+        console.log(`[ERROR] ${new Date().toISOString()} Failed to fetch LM Studio models | ${err.message}`);
+      },
+    });
+  }
+
   // ── Provider display helpers ───────────────────────────────────────────────
   providerLabel(provider: string): string {
-    const map: Record<string, string> = { gemini: 'Gemini', openai: 'OpenAI', claude: 'Claude', ollama: 'Ollama (Local)' };
+    const map: Record<string, string> = {
+      gemini: 'Gemini', openai: 'OpenAI', claude: 'Claude',
+      ollama: 'Ollama (Local)', lmstudio: 'LM Studio',
+    };
     return map[provider] ?? provider;
   }
 
   providerIconClass(provider: string): string {
-    const map: Record<string, string> = { gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu', ollama: 'bi-hdd-fill' };
+    const map: Record<string, string> = {
+      gemini: 'bi-google', openai: 'bi-robot', claude: 'bi-cpu',
+      ollama: 'bi-hdd-fill', lmstudio: 'bi-pc-display',
+    };
     return map[provider] ?? 'bi-box';
   }
 
@@ -161,9 +215,9 @@ export class LlmConfigComponent implements OnInit {
     console.log(`[INIT] ${new Date().toISOString()} verifyLlm() | provider: ${provider} | model: ${resolvedModel}`);
 
     const verifyPayload = { provider, model: resolvedModel, apiKey,
-      ...(provider === 'ollama' && { baseUrl: baseUrl || 'http://localhost:11434' })
-    };
-    this.llmService.verify(verifyPayload).subscribe({
+      ...(provider === 'ollama'   && { baseUrl: baseUrl || 'http://localhost:11434' }),
+      ...(provider === 'lmstudio' && { baseUrl: baseUrl || 'http://localhost:1234' }),
+    };    this.llmService.verify(verifyPayload).subscribe({
       next: (res: LlmVerifyResponse) => {
         this.verifyStatus = 'success';
         this.verifyLatency = res.latency;

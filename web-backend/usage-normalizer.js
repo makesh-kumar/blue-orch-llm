@@ -93,6 +93,21 @@ export function mapProviderUsage(rawUsage, provider, meta = {}) {
     };
   }
 
+  else if (provider === 'lmstudio') {
+    // ── LM Studio (OpenAI-compatible) ──────────────────────────────────────
+    // Standard OpenAI usage fields.  LM Studio also sends a `stats` object
+    // with hardware telemetry — capture tokens_per_second if present.
+    const u = rawUsage ?? {};
+    const tokensPerSecond = meta.stats?.tokens_per_second ?? null;
+    result = {
+      input:     u.prompt_tokens     ?? 0,
+      output:    u.completion_tokens ?? 0,
+      cached:    0,
+      model, provider, latencyMs,
+      ...(tokensPerSecond !== null && { tokensPerSecond }),
+    };
+  }
+
   else {
     result = { input: 0, output: 0, cached: 0, model, provider, latencyMs };
   }

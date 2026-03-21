@@ -12,6 +12,8 @@ export interface StandardizedUsage {
   model: string;
   provider: string;
   latencyMs: number;
+  /** Tokens per second reported by LM Studio's hardware stats. */
+  tokensPerSecond?: number;
 }
 
 export interface ChatMessage {

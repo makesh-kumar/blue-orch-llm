@@ -23,12 +23,13 @@ export const getActiveConfig = () => {
 // Returns: { success: true, id, provider, model, latency, verifiedAt }
 router.post('/verify', async (req, res) => {
   const { provider, model, apiKey, baseUrl } = req.body;
-  const ollamaBase = (baseUrl ?? 'http://localhost:11434').replace(/\/$/, '');
+  const ollamaBase   = (baseUrl ?? 'http://localhost:11434').replace(/\/$/, '');
+  const lmstudioBase = (baseUrl ?? 'http://localhost:1234').replace(/\/$/, '');
 
   if (!provider || !model) {
     return res.status(400).json({ error: 'provider and model are required' });
   }
-  if (provider !== 'ollama' && !apiKey) {
+  if (provider !== 'ollama' && provider !== 'lmstudio' && !apiKey) {
     return res.status(400).json({ error: 'apiKey is required for cloud providers' });
   }
 
@@ -68,6 +69,28 @@ router.post('/verify', async (req, res) => {
         messages: [{ role: 'user', content: 'hi' }],
       });
 
+    } else if (provider === 'lmstudio') {
+      // ── LM Studio — OpenAI-compatible local server ──────────────────────────
+      const OpenAI = (await import('openai')).default;
+      const lmstudio = new OpenAI({ baseURL: `${lmstudioBase}/v1`, apiKey: 'lm-studio' });
+      let modelsRes;
+      try {
+        modelsRes = await lmstudio.models.list();
+      } catch (connectErr) {
+        const isRefused = connectErr.cause?.code === 'ECONNREFUSED' || connectErr.code === 'ECONNREFUSED';
+        throw new Error(
+          isRefused
+            ? 'LM Studio Server Not Found. Enable Developer Mode and Start Server in LM Studio.'
+            : connectErr.message
+        );
+      }
+      const available = (modelsRes.data ?? []).map(m => m.id);
+      if (available.length > 0 && !available.includes(model)) {
+        throw new Error(
+          `Model "${model}" is not loaded in LM Studio. Loaded: ${available.join(', ') || 'none'}`
+        );
+      }
+
     } else {
       return res.status(400).json({ error: `Unknown provider: "${provider}"` });
     }
@@ -78,8 +101,9 @@ router.post('/verify', async (req, res) => {
 
     connectedLlmRegistry.set(id, {
       id, provider, model,
-      apiKey: apiKey ?? '',
-      ...(provider === 'ollama' && { baseUrl: ollamaBase }),
+      apiKey: provider === 'lmstudio' ? 'lm-studio' : (apiKey ?? ''),
+      ...(provider === 'ollama'   && { baseUrl: ollamaBase }),
+      ...(provider === 'lmstudio' && { baseUrl: lmstudioBase }),
       latency, verifiedAt,
     });
 
@@ -95,6 +119,30 @@ router.post('/verify', async (req, res) => {
     const latency = Date.now() - start;
     console.error(`[ERROR] ${ts()} LLM verification failed | provider: ${provider} | ${err.message}`);
     return res.status(400).json({ success: false, latency, error: err.message });
+  }
+});
+
+// ─── GET /api/llm/lmstudio/models ────────────────────────────────────────────
+// Returns the list of models currently loaded in LM Studio.
+// Optional query param: ?baseUrl=http://localhost:1234
+router.get('/lmstudio/models', async (req, res) => {
+  const lmstudioBase = ((req.query.baseUrl ?? 'http://localhost:1234') + '').replace(/\/$/, '');
+  console.log(`[INIT] ${ts()} Fetching LM Studio models | baseUrl: ${lmstudioBase}`);
+  try {
+    const OpenAI = (await import('openai')).default;
+    const lmstudio = new OpenAI({ baseURL: `${lmstudioBase}/v1`, apiKey: 'lm-studio' });
+    const modelsRes = await lmstudio.models.list();
+    const models = (modelsRes.data ?? []).map(m => ({ id: m.id }));
+    console.log(`[SUCCESS] ${ts()} LM Studio models fetched | ${models.length} models`);
+    return res.json({ models });
+  } catch (err) {
+    const isRefused = err.cause?.code === 'ECONNREFUSED' || err.code === 'ECONNREFUSED';
+    console.error(`[ERROR] ${ts()} Failed to fetch LM Studio models | ${err.message}`);
+    return res.status(isRefused ? 503 : 500).json({
+      error: isRefused
+        ? 'LM Studio Server Not Found. Enable Developer Mode and Start Server in LM Studio.'
+        : err.message,
+    });
   }
 });
 

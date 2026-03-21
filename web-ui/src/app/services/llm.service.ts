@@ -81,5 +81,15 @@ export class LlmService {
       )
       .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} LlmService.fetchOllamaModels() | ${res.models.length} models`)));
   }
+
+  fetchLmStudioModels(baseUrl?: string): Observable<{ models: { id: string }[] }> {
+    const url = baseUrl
+      ? `${this.apiUrl}/lmstudio/models?baseUrl=${encodeURIComponent(baseUrl)}`
+      : `${this.apiUrl}/lmstudio/models`;
+    console.log(`[INIT] ${new Date().toISOString()} LlmService.fetchLmStudioModels() | baseUrl: ${baseUrl ?? 'default'}`);
+    return this.http
+      .get<{ models: { id: string }[] }>(url)
+      .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} LlmService.fetchLmStudioModels() | ${res.models.length} models`)));
+  }
 }
 
