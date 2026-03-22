@@ -1,11 +1,14 @@
 {
   "name": "@makeshkumar/blueorch-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "BlueOrch Studio — Modular MCP Orchestrator with LLM chat, served as an npx command",
   "type": "module",
   "main": "server.js",
   "bin": {
     "blueorch": "./bin/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "bin/",
@@ -18,10 +21,16 @@
   "scripts": {
     "start": "NODE_ENV=production node server.js",
     "dev": "NODE_ENV=development node --watch server.js",
-    "build:prod": "cd ../web-ui && ng build",
-    "publish:npm": "npm run build:prod && npm publish"
+    "build:prod": "cd ../blueorch-ui && ng build",
+    "publish:npm": "npm run build:prod && npm publish --access public"
   },
-  "keywords": ["mcp", "orchestrator", "llm", "ai", "blueorch"],
+  "keywords": [
+    "mcp",
+    "orchestrator",
+    "llm",
+    "ai",
+    "blueorch"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@google/genai": "^1.46.0",

@@ -17,8 +17,8 @@ Only provide code for the specific module I am working on.
 <!-- # Folder Structure
 - /mcp-server: Standalone MCP Server (Stdio).
 - /mcp-client-cli: Node.js CLI client to test the server.
-- /web-backend: Express bridge for the UI.
-- /web-ui: Angular 17 project.
+- /blueorch-server: Express bridge for the UI.
+- /blueorch-ui: Angular 17 project.
 - /llm-core: Standalone LLM logic. -->
 
 # Personality
