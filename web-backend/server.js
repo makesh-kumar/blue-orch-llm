@@ -19,7 +19,7 @@ import logRouter    from './log.routes.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:4200';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
