@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 
 const router = Router();
-const ts = () => new Date().toISOString();
+const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
 // ─── LLM Registry ─────────────────────────────────────────────────────────────
 // Map<id, { id, provider, model, apiKey, latency, verifiedAt }>
@@ -97,7 +97,7 @@ router.post('/verify', async (req, res) => {
 
     const latency = Date.now() - start;
     const id = randomUUID();
-    const verifiedAt = new Date().toISOString();
+    const verifiedAt = ts();
 
     connectedLlmRegistry.set(id, {
       id, provider, model,

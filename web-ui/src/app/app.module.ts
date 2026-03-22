@@ -2,6 +2,7 @@ import { NgModule, SecurityContext } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { RouterModule, Routes } from '@angular/router';
 import { CdkTreeModule } from '@angular/cdk/tree';
 import { MARKED_OPTIONS, MarkdownModule, MarkedOptions, MarkedRenderer } from 'ngx-markdown';
 import hljs from 'highlight.js';
@@ -14,7 +15,13 @@ import { ChatComponent } from './components/chat/chat.component';
 import { WorkspaceTabComponent } from './components/workspace-tab/workspace-tab.component';
 import { TokenBadgeComponent } from './components/token-badge/token-badge.component';
 import { UsageBadgeComponent } from './components/usage-badge/usage-badge.component';
+import { LogsComponent } from './components/logs/logs.component';
 import { MonacoEditorModule } from 'ngx-monaco-editor-v2';
+
+const appRoutes: Routes = [
+  { path: '',    component: DashboardComponent },
+  { path: 'logs', component: LogsComponent },
+];
 
 // ─── Custom Marked renderer ────────────────────────────────────────────────────────────
 // Must be an exported named function (not lambda) for AOT compatibility.
@@ -80,6 +87,7 @@ export function markedOptionsFactory(): MarkedOptions {
     TokenBadgeComponent,
     UsageBadgeComponent,
     WorkspaceTabComponent,
+    LogsComponent,
   ],
   imports: [
     BrowserModule,
@@ -87,6 +95,7 @@ export function markedOptionsFactory(): MarkedOptions {
     FormsModule,
     ReactiveFormsModule,
     CdkTreeModule,
+    RouterModule.forRoot(appRoutes, { useHash: false }),
     MonacoEditorModule.forRoot({ baseUrl: 'assets/monaco' }),
     MarkdownModule.forRoot({
       sanitize: SecurityContext.NONE,

@@ -6,7 +6,7 @@ import { getOrCreateCache, truncateIfLarge } from './cache-manager.js';
 import { mapProviderUsage } from './usage-normalizer.js';
 
 const router = Router();
-const ts = () => new Date().toISOString();
+const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 const PATH_KEY_PATTERN = /(path|file|dir|directory|folder|filename)$/i;
 const PATH_TEXT_PATTERN = /(absolute path|relative path|file path|directory path|folder path|workspace path|file name|filename|directory|folder|path)/i;
 

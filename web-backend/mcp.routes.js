@@ -15,7 +15,7 @@ const PATH_TEXT_PATTERN = /(absolute path|relative path|file path|directory path
 // Exported so chat.routes.js can call tools on active connections.
 export const activeClients = new Map();
 
-const ts = () => new Date().toISOString();
+const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
 function isPathLikeSchemaProperty(key, schemaProperty) {
   const normalizedKey = (key ?? '').replace(/[_-]/g, '').toLowerCase();
@@ -152,7 +152,7 @@ router.post('/connect', async (req, res) => {
       args: resolvedArgs,
       label,
       logs,
-      connectedAt: new Date().toISOString(),
+      connectedAt: ts(),
     });
 
     // Capture spawned server's stderr as log entries
@@ -162,7 +162,7 @@ router.post('/connect', async (req, res) => {
       chunk.toString().split('\n').forEach(line => {
         const trimmed = line.trim();
         if (trimmed) {
-          entry.logs.push(`[SERVER] ${new Date().toISOString()} ${trimmed}`);
+          entry.logs.push(`[SERVER] ${ts()} ${trimmed}`);
           if (entry.logs.length > 300) entry.logs.shift();
         }
       });

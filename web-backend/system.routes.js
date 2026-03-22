@@ -4,7 +4,7 @@ import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
 import { resolve, join } from 'path';
 
 const router = Router();
-const ts = () => new Date().toISOString();
+const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
 // ─── GET /api/system/env ──────────────────────────────────────────────────────
 // Returns environment information for the current machine.

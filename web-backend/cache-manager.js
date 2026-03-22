@@ -32,7 +32,7 @@ const IGNORE_DIRS = new Set([
   '__pycache__', '.next', 'coverage', '.cache', 'vendor', 'out',
 ]);
 
-const ts = () => new Date().toISOString();
+const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
 // ─── Cache Store ──────────────────────────────────────────────────────────────
 // Map: workspacePath → { cacheName: string, expiresAt: number, apiKey: string }

@@ -14,7 +14,7 @@
  * @property {number} latencyMs  - Wall-clock request latency in milliseconds
  */
 
-const ts = () => new Date().toISOString();
+const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
 /**
  * Normalise a raw provider usage object into a StandardizedUsage object.
