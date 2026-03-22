@@ -7,7 +7,7 @@
 
 import { program } from 'commander';
 import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
 import open from 'open';
 
@@ -25,7 +25,7 @@ program
   .description(pkg.description)
   .version(pkg.version)
   .option('-p, --port <number>', 'Port to run the server on', '3000')
-  .parse();
+  .parse(process.argv);
 
 const { port: portStr } = program.opts();
 const port = Number(portStr);
@@ -44,7 +44,18 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 console.log(`[INIT] ${ts()} BlueOrch Studio | port=${port} | NODE_ENV=${process.env.NODE_ENV}`);
 
 // ─── Start the Express server ─────────────────────────────────────────────────
-await import(join(__dirname, '../server.js'));
+const serverPath = join(__dirname, '../server.js');
+const serverUrl  = pathToFileURL(serverPath).href;
+
+try {
+  // Keep argv intact so any downstream startup logic can still inspect CLI args.
+  await import(serverUrl);
+} catch (error) {
+  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  console.error(`[ERROR] ${ts()} Failed to start BlueOrch Studio backend`);
+  console.error(message);
+  process.exit(1);
+}
 
 // ─── Open browser once server is healthy ─────────────────────────────────────
 const appUrl = `http://localhost:${port}`;
