@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export interface ChatHistoryResponse {
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
-  private readonly apiUrl = 'http://localhost:3000/api/chat';
+  private readonly apiUrl = `${environment.apiUrl}/api/chat`;
 
   constructor(private http: HttpClient) {
     console.log(`[INIT] ${new Date().toISOString()} ChatService initialized | apiUrl: ${this.apiUrl}`);

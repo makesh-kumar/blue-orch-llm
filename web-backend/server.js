@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
@@ -17,12 +18,13 @@ import systemRouter from './system.routes.js';
 import logRouter    from './log.routes.js';
 
 const app  = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:4200';
 
 const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
 // Allow requests from the Angular dev server
-app.use(cors({ origin: 'http://localhost:4200' }));
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 // ─── Route modules ────────────────────────────────────────────────────────────

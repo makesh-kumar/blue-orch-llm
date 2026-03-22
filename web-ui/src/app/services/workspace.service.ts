@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { map, tap } from 'rxjs/operators';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -31,7 +32,7 @@ const LS_HOME    = 'blueorchstudio_workspaceHomeDir';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
-  private readonly backendUrl = 'http://localhost:3000';
+  private readonly backendUrl = environment.apiUrl;
 
   /** The machine's $HOME – resolved once from backend on init. */
   private homeDir = '';

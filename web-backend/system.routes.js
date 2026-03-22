@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { homedir } from 'os';
 import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
 import { resolve, join } from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const router = Router();
 const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
@@ -114,6 +117,34 @@ router.post('/files/create', async (req, res) => {
     console.error(`[ERROR] ${ts()} POST /files/create | ${err.message}`);
     return res.status(status).json({ error: err.message });
   }
+});
+
+// ─── GET /api/system/health ──────────────────────────────────────────────────
+// Simple ping used by the UI to know the server is back up after a restart.
+router.get('/health', (_req, res) => {
+  return res.json({ ok: true, ts: ts() });
+});
+
+// ─── POST /api/system/restart ─────────────────────────────────────────────────
+// Spawns a fresh `node server.js` then exits the current process.
+// The UI should poll GET /api/system/health until it responds, then reload.
+router.post('/restart', (_req, res) => {
+  console.log(`[INIT] ${ts()} Server restart requested`);
+  res.json({ ok: true, message: 'Restarting…' });
+
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const serverPath = join(__dirname, 'server.js');
+
+  setTimeout(() => {
+    const child = spawn(process.execPath, [serverPath], {
+      detached: true,
+      stdio:    'inherit',
+      cwd:      __dirname,
+      env:      process.env,
+    });
+    child.unref();
+    process.exit(0);
+  }, 300);
 });
 
 export default router;

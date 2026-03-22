@@ -13,6 +13,13 @@
     <a href="/logs" target="_blank" rel="noopener" class="logs-nav-btn ms-2" title="Open live logs in new tab">
       <i class="bi bi-terminal-fill me-1"></i>Logs
     </a>
+    <button class="restart-btn ms-2"
+            (click)="restartServer()"
+            [disabled]="isRestarting"
+            [bsTooltip]="'Restart backend server'" tooltipPlacement="bottom">
+      <span *ngIf="isRestarting" class="spinner-border spinner-border-sm" role="status"></span>
+      <i *ngIf="!isRestarting" class="bi bi-arrow-clockwise"></i>
+    </button>
   </div>
 </nav>
 

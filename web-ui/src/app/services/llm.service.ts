@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { tap } from 'rxjs/operators';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ export interface LlmRegistryResponse {
 
 @Injectable({ providedIn: 'root' })
 export class LlmService {
-  private readonly apiUrl = 'http://localhost:3000/api/llm';
+  private readonly apiUrl = `${environment.apiUrl}/api/llm`;
 
   constructor(private http: HttpClient) {
     console.log(`[INIT] ${new Date().toISOString()} LlmService initialized | apiUrl: ${this.apiUrl}`);

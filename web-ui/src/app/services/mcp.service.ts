@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ export interface LogsResponse {
 
 @Injectable({ providedIn: 'root' })
 export class McpService {
-  private readonly apiUrl = 'http://localhost:3000/api/mcp';
+  private readonly apiUrl = `${environment.apiUrl}/api/mcp`;
 
   constructor(private http: HttpClient) {
     console.log(`[INIT] ${new Date().toISOString()} McpService initialized | apiUrl: ${this.apiUrl}`);

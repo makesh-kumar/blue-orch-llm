@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface LogEntry {
   level:     string;
@@ -10,7 +11,7 @@ export interface LogEntry {
 
 @Injectable({ providedIn: 'root' })
 export class LogsService {
-  private readonly baseUrl = 'http://localhost:3000/api/logs';
+  private readonly baseUrl = `${environment.apiUrl}/api/logs`;
 
   constructor(private http: HttpClient) {}
 

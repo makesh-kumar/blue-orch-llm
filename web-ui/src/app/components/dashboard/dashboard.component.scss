@@ -49,7 +49,32 @@
   }
 }
 
-// ── Logs nav button ──────────────────────────────────────────────────────────
+// ── Restart button ───────────────────────────────────────────────────────────
+.restart-btn {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           34px;
+  height:          34px;
+  border-radius:   50%;
+  border:          1px solid rgba(255, 255, 255, 0.3);
+  background:      rgba(255, 255, 255, 0.1);
+  color:           #fff;
+  cursor:          pointer;
+  font-size:       0.95rem;
+  transition:      background .15s, border-color .15s, transform .2s;
+
+  &:hover:not(:disabled) {
+    background:   rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform:    rotate(30deg) scale(1.08);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor:  not-allowed;
+  }
+}
 .logs-nav-btn {
   display:        inline-flex;
   align-items:    center;
