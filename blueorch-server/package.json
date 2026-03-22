@@ -1,6 +1,6 @@
 {
   "name": "@makeshkumar/blueorch-studio",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "BlueOrch Studio — Modular MCP Orchestrator with LLM chat, served as an npx command",
   "type": "module",
   "main": "server.js",
