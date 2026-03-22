@@ -5,6 +5,11 @@
     <span class="navbar-brand fw-bold fs-5">
       <i class="bi bi-diagram-3-fill me-2"></i>BlueOrch — Orchestrator
     </span>
+    <button class="dark-mode-toggle ms-auto"
+            (click)="toggleDarkMode()"
+            [title]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+      <i class="bi" [ngClass]="isDarkMode ? 'bi-sun-fill' : 'bi-moon-stars-fill'"></i>
+    </button>
   </div>
 </nav>
 

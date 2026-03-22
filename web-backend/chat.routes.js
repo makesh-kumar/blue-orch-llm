@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { isAbsolute, join } from 'path';
 import { connectedLlmRegistry } from './llm.routes.js';
 import { activeClients } from './mcp.routes.js';
 import { getOrCreateCache, truncateIfLarge } from './cache-manager.js';
@@ -6,6 +7,8 @@ import { mapProviderUsage } from './usage-normalizer.js';
 
 const router = Router();
 const ts = () => new Date().toISOString();
+const PATH_KEY_PATTERN = /(path|file|dir|directory|folder|filename)$/i;
+const PATH_TEXT_PATTERN = /(absolute path|relative path|file path|directory path|folder path|workspace path|file name|filename|directory|folder|path)/i;
 
 // ─── In-memory chat session (Phase 3: single session) ─────────────────────────
 // Format: [{ role: 'user' | 'assistant', content: string }]
@@ -73,6 +76,98 @@ function withAbort(promise, abortSignal) {
       }
     );
   });
+}
+
+function isPathLikeSchemaProperty(key, schemaProperty) {
+  const normalizedKey = (key ?? '').replace(/[_-]/g, '').toLowerCase();
+  const descriptionText = [
+    schemaProperty?.description,
+    schemaProperty?.title,
+  ].filter(Boolean).join(' ');
+  const schemaType = schemaProperty?.type;
+
+  if (schemaType && schemaType !== 'string') {
+    return false;
+  }
+
+  if (normalizedKey === 'content') {
+    return false;
+  }
+
+  return PATH_KEY_PATTERN.test(normalizedKey) || PATH_TEXT_PATTERN.test(descriptionText);
+}
+
+function getPathArgumentKeys(toolArgs, inputSchema) {
+  const schemaProperties = inputSchema?.properties ?? {};
+  const keys = new Set();
+
+  for (const [key, schemaProperty] of Object.entries(schemaProperties)) {
+    if (isPathLikeSchemaProperty(key, schemaProperty)) {
+      keys.add(key);
+    }
+  }
+
+  for (const [key, value] of Object.entries(toolArgs ?? {})) {
+    if (typeof value !== 'string') continue;
+    if (isPathLikeSchemaProperty(key, schemaProperties[key])) {
+      keys.add(key);
+    }
+  }
+
+  return [...keys];
+}
+
+function resolveWorkspacePathValue(pathValue, activeWorkspacePath) {
+  console.log(`[INIT] ${ts()} resolveWorkspacePathValue()`);
+
+  if (!activeWorkspacePath || typeof pathValue !== 'string') {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | no rewrite`);
+    return pathValue;
+  }
+
+  const trimmedPath = pathValue.trim();
+
+  if (!trimmedPath || trimmedPath === '.' || trimmedPath === './') {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | workspace root injected`);
+    return activeWorkspacePath;
+  }
+
+  if (isAbsolute(trimmedPath)) {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | absolute path preserved`);
+    return trimmedPath;
+  }
+
+  const resolvedPath = join(activeWorkspacePath, trimmedPath);
+  console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | resolved: "${resolvedPath}"`);
+  return resolvedPath;
+}
+
+function resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, inputSchema) {
+  console.log(`[INIT] ${ts()} resolveWorkspaceToolArgs() | tool: ${toolName}`);
+
+  const finalArgs = { ...(toolArgs ?? {}) };
+
+  if (!activeWorkspacePath) {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspaceToolArgs() | no active workspace`);
+    return finalArgs;
+  }
+
+  const keysToResolve = getPathArgumentKeys(finalArgs, inputSchema);
+
+  let didRewrite = false;
+
+  for (const key of keysToResolve) {
+    const nextValue = resolveWorkspacePathValue(finalArgs[key], activeWorkspacePath);
+    if (nextValue !== undefined && nextValue !== finalArgs[key]) {
+      finalArgs[key] = nextValue;
+      didRewrite = true;
+    }
+  }
+
+  console.log(
+    `[SUCCESS] ${ts()} resolveWorkspaceToolArgs() | tool: ${toolName} | rewritten: ${didRewrite}`
+  );
+  return finalArgs;
 }
 
 // ─── Provider handlers ─────────────────────────────────────────────────────────
@@ -486,7 +581,7 @@ router.post('/send', async (req, res) => {
   };
 
   // ── Build tool definitions and executor lookup ────────────────────────────
-  const toolLookup = {};   // toolName → connectionId
+  const toolLookup = {};   // toolName → { connectionId, tool }
   const toolDefs = [];
 
   for (const { connectionId, toolName } of (activeTools ?? [])) {
@@ -494,18 +589,27 @@ router.post('/send', async (req, res) => {
     if (!mcpEntry) continue;
     const tool = mcpEntry.tools.find(t => t.name === toolName);
     if (!tool) continue;
-    toolLookup[toolName] = connectionId;
+    toolLookup[toolName] = { connectionId, tool };
     toolDefs.push(tool);
   }
 
   const executeTool = async (toolName, toolArgs) => {
     ensureNotCancelled();
-    const connectionId = toolLookup[toolName];
-    if (!connectionId) throw new Error(`No MCP connection for tool "${toolName}"`);
+    const toolEntry = toolLookup[toolName];
+    if (!toolEntry) throw new Error(`No MCP connection for tool "${toolName}"`);
+    const { connectionId, tool } = toolEntry;
     const mcpEntry = activeClients.get(connectionId);
     if (!mcpEntry) throw new Error(`MCP connection "${connectionId}" is no longer active`);
+    console.log('aaaaaaaaaaaaaaaaaaaaaa ', activeWorkspacePath);
+    const finalArgs = resolveWorkspaceToolArgs(
+      toolName,
+      toolArgs,
+      activeWorkspacePath,
+      tool?.inputSchema
+    );
+    console.log('^^^^^^^^^^^^^^^^ ',finalArgs);
     const result = await withAbort(
-      mcpEntry.client.callTool({ name: toolName, arguments: toolArgs ?? {} }),
+      mcpEntry.client.callTool({ name: toolName, arguments: finalArgs }),
       abortController.signal
     );
     ensureNotCancelled();
@@ -553,7 +657,7 @@ router.post('/send', async (req, res) => {
 
     // Persist to session history
     chatHistory.push({ role: 'user',      content: message });
-    chatHistory.push({ role: 'assistant', content: reply });
+    chatHistory.push({ role: 'assistant', content: reply, toolsUsed, standardizedUsage });
 
     console.log(`[SUCCESS] ${ts()} Chat complete | toolsUsed: [${toolsUsed.join(', ')}] | usage: ${JSON.stringify(standardizedUsage)}`);
     return res.json({ reply, toolsUsed, standardizedUsage });

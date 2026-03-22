@@ -2,7 +2,18 @@ import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { FlatTreeControl } from '@angular/cdk/tree';
 import { WorkspaceService, FileTreeItem } from '../../services/workspace.service';
-import { FileNode } from '../workspace-bar/workspace-bar.component';
+
+export interface FileNode {
+  name: string;
+  type: 'file' | 'directory';
+  path: string;
+  level: number;
+  expandable: boolean;
+  loading: boolean;
+  inContext: boolean;
+  childrenLoaded: boolean;
+  children: FileNode[];
+}
 
 // Monaco editor options
 const BASE_EDITOR_OPTIONS = {
@@ -97,6 +108,7 @@ export class WorkspaceTabComponent implements OnInit, OnDestroy {
   newInputError  = '';
 
   private sub!: Subscription;
+  private _skipNextLoad = false;
 
   constructor(public workspaceService: WorkspaceService) {
     console.log(`[INIT] ${new Date().toISOString()} WorkspaceTabComponent initialized`);
@@ -104,8 +116,12 @@ export class WorkspaceTabComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.sub = this.workspaceService.activePath$.subscribe(path => {
-      this.activePath   = path;
-      this.pathInput    = path;
+      this.activePath = path;
+      this.pathInput  = path;
+      if (this._skipNextLoad) {
+        this._skipNextLoad = false;
+        return;
+      }
       this.treeRootPath = path;
       this._loadRoot(path || '/');
     });
@@ -147,6 +163,11 @@ export class WorkspaceTabComponent implements OnInit, OnDestroy {
     this._loadRoot(parent);
   }
 
+  onDirRowClick(event: MouseEvent, node: FileNode): void {
+    if ((event.target as HTMLElement).closest('button')) return;
+    this.navigateInto(node);
+  }
+
   navigateInto(node: FileNode): void {
     if (node.type !== 'directory') return;
     this.treeError = '';
@@ -155,6 +176,7 @@ export class WorkspaceTabComponent implements OnInit, OnDestroy {
 
   setAsRoot(node: FileNode): void {
     if (node.type !== 'directory') return;
+    this._skipNextLoad = true;
     this.workspaceService.setPath(node.path);
   }
 

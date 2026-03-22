@@ -47,7 +47,7 @@ export interface SendChatResponse {
 }
 
 export interface ChatHistoryResponse {
-  history: { role: string; content: string }[];
+  history: { role: string; content: string; toolsUsed?: string[]; standardizedUsage?: StandardizedUsage | null }[];
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────

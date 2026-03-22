@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { homedir } from 'os';
+import { isAbsolute, join } from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const router = Router();
+const PATH_KEY_PATTERN = /(path|file|dir|directory|folder|filename)$/i;
+const PATH_TEXT_PATTERN = /(absolute path|relative path|file path|directory path|folder path|workspace path|file name|filename|directory|folder|path)/i;
 
 // ─── Active Clients Map ───────────────────────────────────────────────────────
 // Key:   connectionId (UUID)
@@ -13,6 +16,91 @@ const router = Router();
 export const activeClients = new Map();
 
 const ts = () => new Date().toISOString();
+
+function isPathLikeSchemaProperty(key, schemaProperty) {
+  const normalizedKey = (key ?? '').replace(/[_-]/g, '').toLowerCase();
+  const descriptionText = [
+    schemaProperty?.description,
+    schemaProperty?.title,
+  ].filter(Boolean).join(' ');
+  const schemaType = schemaProperty?.type;
+
+  if (schemaType && schemaType !== 'string') {
+    return false;
+  }
+
+  if (normalizedKey === 'content') {
+    return false;
+  }
+
+  return PATH_KEY_PATTERN.test(normalizedKey) || PATH_TEXT_PATTERN.test(descriptionText);
+}
+
+function getPathArgumentKeys(toolArgs, inputSchema) {
+  const schemaProperties = inputSchema?.properties ?? {};
+  const keys = new Set();
+
+  for (const [key, schemaProperty] of Object.entries(schemaProperties)) {
+    if (isPathLikeSchemaProperty(key, schemaProperty)) {
+      keys.add(key);
+    }
+  }
+
+  for (const [key, value] of Object.entries(toolArgs ?? {})) {
+    if (typeof value !== 'string') continue;
+    if (isPathLikeSchemaProperty(key, schemaProperties[key])) {
+      keys.add(key);
+    }
+  }
+
+  return [...keys];
+}
+
+function resolveWorkspacePathValue(pathValue, activeWorkspacePath) {
+  console.log(`[INIT] ${ts()} resolveWorkspacePathValue()`);
+
+  if (!activeWorkspacePath || typeof pathValue !== 'string') {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | no rewrite`);
+    return pathValue;
+  }
+
+  const trimmedPath = pathValue.trim();
+
+  if (!trimmedPath || trimmedPath === '.' || trimmedPath === './') {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | workspace root injected`);
+    return activeWorkspacePath;
+  }
+
+  if (isAbsolute(trimmedPath)) {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | absolute path preserved`);
+    return trimmedPath;
+  }
+
+  const resolvedPath = join(activeWorkspacePath, trimmedPath);
+  console.log(`[SUCCESS] ${ts()} resolveWorkspacePathValue() | resolved: "${resolvedPath}"`);
+  return resolvedPath;
+}
+
+function resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, inputSchema) {
+  console.log(`[INIT] ${ts()} resolveWorkspaceToolArgs() | tool: ${toolName}`);
+
+  const finalArgs = { ...(toolArgs ?? {}) };
+  const keysToResolve = getPathArgumentKeys(finalArgs, inputSchema);
+
+  let didRewrite = false;
+  for (const key of keysToResolve) {
+    const nextValue = resolveWorkspacePathValue(finalArgs[key], activeWorkspacePath || homedir());
+    if (nextValue !== undefined && nextValue !== finalArgs[key]) {
+      finalArgs[key] = nextValue;
+      didRewrite = true;
+    }
+  }
+
+  console.log(
+    `[SUCCESS] ${ts()} resolveWorkspaceToolArgs() | tool: ${toolName} | rewritten: ${didRewrite}`
+  );
+  return finalArgs;
+}
 
 // ─── POST /api/mcp/connect ────────────────────────────────────────────────────
 // Body: { command: string, args: string[] }
@@ -201,19 +289,11 @@ router.post('/proxy', async (req, res) => {
   if (!entry) {
     return res.status(404).json({ error: `Connection "${connectionId}" not found` });
   }
+  console.log('***************************** ',activeWorkspacePath)
 
-  const finalArgs = { ...(toolArgs ?? {}) };
-
-  // Inject workspace path when tool operates on files and no explicit path given
-  const PATH_TOOLS = ['list_directory', 'read_file'];
-  if (PATH_TOOLS.includes(toolName)) {
-    const p = (finalArgs.path ?? '').trim();
-    if (!p || p === '.' || p === './') {
-      finalArgs.path = activeWorkspacePath || homedir();
-      console.log(`[INIT] ${ts()} Proxy path injected: "${finalArgs.path}" for tool "${toolName}"`);
-    }
-  }
-
+  const tool = entry.tools.find(t => t.name === toolName);
+  const finalArgs = resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, tool?.inputSchema);
+console.log('##################### ',finalArgs)
   entry.logs.push(`[BRIDGE] ${ts()} Proxy tool: ${toolName} | args: ${JSON.stringify(finalArgs)}`);
   console.log(`[INIT] ${ts()} /mcp/proxy | tool: ${toolName} | connection: ${connectionId}`);
 

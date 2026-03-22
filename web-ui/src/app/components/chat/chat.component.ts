@@ -72,6 +72,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   // ── Token / Cost tracking
   totalSessionCost = 0;
 
+  // ── Copy response feedback
+  copiedTimestamp: string | null = null;
+
   // ── Project Mode (off by default — user opts in explicitly)
   isProjectModeActive = false;
 
@@ -235,6 +238,11 @@ export class ChatComponent implements OnInit, AfterViewChecked {
           role: h.role as 'user' | 'assistant',
           content: h.content,
           timestamp: new Date().toISOString(),
+          toolsUsed: h.toolsUsed,
+          standardizedUsage: h.standardizedUsage ?? null,
+          turnCost: h.standardizedUsage
+            ? this.usageCalc.calculateCost(h.standardizedUsage)
+            : 0,
         }));
         if (this.messages.length > 0) this.shouldScroll = true;
         console.log(`[SUCCESS] ${new Date().toISOString()} Chat history loaded | ${this.messages.length} messages`);
@@ -365,6 +373,16 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       btn.textContent = 'Error';
       console.log(`[ERROR] ${new Date().toISOString()} Clipboard write failed | ${err.message}`);
       setTimeout(() => { btn.textContent = orig; }, 2000);
+    });
+  }
+
+  copyResponse(msg: ChatMessage): void {
+    navigator.clipboard.writeText(msg.content).then(() => {
+      this.copiedTimestamp = msg.timestamp;
+      console.log(`[SUCCESS] ${new Date().toISOString()} AI response copied to clipboard`);
+      setTimeout(() => { this.copiedTimestamp = null; }, 2000);
+    }).catch(err => {
+      console.log(`[ERROR] ${new Date().toISOString()} Clipboard write failed | ${err.message}`);
     });
   }
 

@@ -11,7 +11,6 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { McpConfigComponent } from './components/mcp-config/mcp-config.component';
 import { LlmConfigComponent } from './components/llm-config/llm-config.component';
 import { ChatComponent } from './components/chat/chat.component';
-import { WorkspaceBarComponent } from './components/workspace-bar/workspace-bar.component';
 import { WorkspaceTabComponent } from './components/workspace-tab/workspace-tab.component';
 import { TokenBadgeComponent } from './components/token-badge/token-badge.component';
 import { UsageBadgeComponent } from './components/usage-badge/usage-badge.component';
@@ -78,7 +77,6 @@ export function markedOptionsFactory(): MarkedOptions {
     McpConfigComponent,
     LlmConfigComponent,
     ChatComponent,
-    WorkspaceBarComponent,
     TokenBadgeComponent,
     UsageBadgeComponent,
     WorkspaceTabComponent,

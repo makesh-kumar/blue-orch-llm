@@ -119,7 +119,8 @@
         <cdk-tree-node *cdkTreeNodeDef="let node; when: hasChild"
                        class="ws-tree-node ws-node-dir"
                        [class.is-active-root]="node.path === activePath"
-                       [style.padding-left.px]="node.level * 16 + 4">
+                       [style.padding-left.px]="node.level * 16 + 4"
+                       (click)="onDirRowClick($event, node)">
 
           <button class="btn-expand"
                   (click)="toggleNode(node)"
@@ -136,8 +137,7 @@
              [class.bi-folder2-open]="isExpanded(node)"></i>
 
           <span class="node-label small text-truncate flex-1 dir-label"
-                [title]="'Open: ' + node.path"
-                (click)="navigateInto(node)">{{ node.name }}</span>
+                [title]="'Open: ' + node.path">{{ node.name }}</span>
 
           <button class="btn-pin flex-shrink-0"
                   (click)="$event.stopPropagation(); setAsRoot(node)"
@@ -156,10 +156,8 @@
 
     <!-- Legend -->
     <div class="ws-legend border-top px-3 py-1 d-flex align-items-center gap-3 small text-muted bg-light">
-      <span><i class="bi bi-chevron-right me-1"></i>Expand</span>
-      <span><i class="bi bi-folder-fill text-warning me-1"></i>Open</span>
-      <span><i class="bi bi-pin text-primary me-1"></i>Set Root</span>
-      <span><i class="bi bi-file-earmark-plus text-success me-1"></i>New File/Folder: top bar ⬆</span>
+      <span><i class="bi bi-pin me-1"></i>Set root folder</span>
+      <span><i class="bi bi-check2-square me-1"></i>Select file for context</span>
     </div>
 
   </div>

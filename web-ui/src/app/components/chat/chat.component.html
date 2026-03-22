@@ -192,7 +192,15 @@
               [usage]="msg.standardizedUsage"
               [cost]="msg.turnCost ?? 0">
             </app-usage-badge>
-            <span class="msg-time">{{ msg.timestamp | date:'HH:mm' }}</span>
+            <div class="d-flex align-items-center gap-2">
+              <span class="msg-time">{{ msg.timestamp | date:'HH:mm' }}</span>
+              <button class="msg-copy-btn"
+                      [class.msg-copy-btn--copied]="copiedTimestamp === msg.timestamp"
+                      (click)="copyResponse(msg)"
+                      title="Copy response">
+                <i class="bi" [ngClass]="copiedTimestamp === msg.timestamp ? 'bi-check2' : 'bi-clipboard'"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -234,8 +242,8 @@
       <!-- Floating error toast (does not affect layout) -->
       <div *ngIf="showError" class="chat-error-toast">
         <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
-        <span class="flex-1" style="height: 100%;">{{ errorMessage }}</span>
-        <button class="btn-close btn-close-sm ms-2" style="width: 100px;" (click)="dismissError()"></button>
+        <span class="flex-grow-1">{{ errorMessage }}</span>
+        <button class="btn-close btn-close-sm ms-2" (click)="dismissError()"></button>
       </div>
 
       <div class="input-group">
@@ -247,7 +255,7 @@
                   [disabled]="isThinking"
                   style="resize: none;"></textarea>
 
-        <button class="btn btn-outline-danger px-3"
+        <button class="btn btn-danger px-3"
                 *ngIf="isThinking"
                 (click)="stopGeneration()"
                 title="Stop current response">
