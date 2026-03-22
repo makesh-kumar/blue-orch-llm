@@ -1,4 +1,4 @@
-# BlueOrch Studio 🔵
+# BlueOrch Studio <img src="blueorch-ui/src/favicon.svg" alt="terminal" width="22" height="22" style="vertical-align:middle;background:#1a73e8;border-radius:4px;padding:2px;"> 🔵
 
 > **A Modular MCP Orchestrator** — Bridging multiple LLM providers with Model Context Protocol (MCP) tools through a sleek full-stack web interface.
 
@@ -16,8 +16,8 @@
 8. [Running the Application](#running-the-application)
 9. [Environment Variables](#environment-variables)
 10. [Module Reference](#module-reference)
-    - [web-ui](#web-ui-angular-17-frontend)
-    - [web-backend](#web-backend-nodejs-express-api)
+    - [blueorch-ui](#blueorch-ui-angular-17-frontend)
+    - [blueorch-server](#blueorch-server-nodejs-express-api)
     - [mcp-server](#mcp-server-standalone-mcp-server)
     - [mcp-client-cli](#mcp-client-cli)
     - [llm-cli](#llm-cli)
@@ -110,7 +110,7 @@ The system lets you configure providers, connect MCP tool servers, explore your 
 
 ```
 blue-orch-llm/
-├── web-ui/                # Angular 17 frontend SPA
+├── blueorch-ui/               # Angular 17 frontend SPA
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── components/
@@ -135,7 +135,7 @@ blue-orch-llm/
 │   │       └── environment.prod.ts     # Prod: override apiUrl here
 │   └── package.json
 │
-├── web-backend/           # Node.js / Express API server
+├── blueorch-server/           # Node.js / Express API server
 │   ├── server.js          # App entry point; route registration
 │   ├── logger.js          # Winston logger + SSE EventEmitter
 │   ├── cache-manager.js   # Gemini context cache builder
@@ -165,7 +165,7 @@ blue-orch-llm/
 
 ## Tech Stack
 
-### Frontend (`web-ui`)
+### Frontend (`blueorch-ui`)
 
 | Category | Technology | Version |
 |----------|-----------|---------|
@@ -181,7 +181,7 @@ blue-orch-llm/
 
 > **Convention**: Traditional Angular syntax only — constructor injection, Observables. No Signals, no `inject()`.
 
-### Backend (`web-backend`)
+### Backend (`blueorch-server`)
 
 | Category | Technology | Version |
 |----------|-----------|---------|
@@ -218,8 +218,8 @@ git clone https://github.com/makesh-kumar/blue-orch-llm.git
 cd blue-orch-llm
 
 # Install all modules
-(cd web-ui && npm install)
-(cd web-backend && npm install)
+(cd blueorch-ui && npm install)
+(cd blueorch-server && npm install)
 (cd mcp-server && npm install)
 (cd mcp-client-cli && npm install)
 (cd llm-cli && npm install)
@@ -236,7 +236,7 @@ Open **two terminals** and run the following commands:
 **Terminal 1 — Backend API Server**
 
 ```bash
-cd web-backend
+cd blueorch-server
 
 # Create a .env file (see Environment Variables section)
 # Then start the backend:
@@ -249,8 +249,7 @@ The API will be available at `http://localhost:3500`.
 **Terminal 2 — Angular Frontend**
 
 ```bash
-cd web-ui
-npm start
+cd blueorch-ui
 # or: npx ng serve
 ```
 
@@ -289,13 +288,13 @@ npm start
 
 ```bash
 # 1. Build the Angular SPA
-cd web-ui
+cd blueorch-ui
 npm run build
-# Output: web-ui/dist/web-ui/
+# Output: blueorch-ui/dist/blueorch-ui/
 
 # 2. Optionally serve the built SPA with the backend or via nginx
 # 3. Start backend in production
-cd web-backend
+cd blueorch-server
 NODE_ENV=production PORT=3500 npm start
 ```
 
@@ -303,7 +302,7 @@ NODE_ENV=production PORT=3500 npm start
 
 ## Environment Variables
 
-Create a `.env` file in the `web-backend/` directory:
+Create a `.env` file in the `blueorch-server/` directory:
 
 ```dotenv
 # Server
@@ -333,7 +332,7 @@ OLLAMA_BASE=http://localhost:11434
 
 ## Module Reference
 
-### `web-ui` — Angular 17 Frontend
+### `blueorch-ui` — Angular 17 Frontend
 
 The single-page application served at `localhost:4200`.
 
@@ -360,11 +359,11 @@ The single-page application served at `localhost:4200`.
 
 ---
 
-### `web-backend` — Node.js Express API
+### `blueorch-server` — Node.js Express API
 
 REST API server on `localhost:3500`.
 
-**Entry Point:** `web-backend/server.js`
+**Entry Point:** `blueorch-server/server.js`
 
 **Supporting Modules:**
 
