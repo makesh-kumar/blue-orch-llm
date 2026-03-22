@@ -29,3 +29,5 @@ Thumbs.db
 # Environment and Secrets
 .env
 .env.*
+
+public

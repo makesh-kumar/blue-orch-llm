@@ -1,7 +1,7 @@
+// Production environment — Angular is served by the same Express server,
+// so all API calls use a relative path (same host + port).
+// This means the UI automatically adapts to whatever port npx blueorch runs on.
 export const environment = {
   production: true,
-  // In production, the Angular app is typically served from the same origin as
-  // the Express backend, so an empty string resolves to the same host/port.
-  // Override this with the full URL if you deploy them separately.
-  apiUrl: 'http://localhost:3500',
+  apiUrl: '',
 };

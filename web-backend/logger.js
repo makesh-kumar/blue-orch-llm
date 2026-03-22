@@ -1,9 +1,15 @@
 import winston from 'winston';
 import { EventEmitter } from 'events';
 import { mkdirSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
+const LOGS_DIR   = join(__dirname, 'logs');
 
 // Ensure logs directory exists
-mkdirSync('./logs', { recursive: true });
+mkdirSync(LOGS_DIR, { recursive: true });
 
 const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
@@ -52,7 +58,7 @@ export const logger = winston.createLogger({
   transports: [
     // File: errors only — max 2 MB, keep 3 rotated files
     new winston.transports.File({
-      filename: './logs/error.log',
+      filename: join(LOGS_DIR, 'error.log'),
       level:    'error',
       maxsize:  2 * 1024 * 1024, // 2 MB
       maxFiles: 3,
@@ -60,7 +66,7 @@ export const logger = winston.createLogger({
     }),
     // File: all levels — max 5 MB, keep 3 rotated files
     new winston.transports.File({
-      filename: './logs/combined.log',
+      filename: join(LOGS_DIR, 'combined.log'),
       maxsize:  5 * 1024 * 1024, // 5 MB
       maxFiles: 3,
       tailable: true,

@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 // ─── Logger must be imported first so console is overridden before routes load ─
 import { logger } from './logger.js';
@@ -20,6 +23,9 @@ import logRouter    from './log.routes.js';
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
+const IS_PROD    = process.env.NODE_ENV === 'production';
 
 const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
 
@@ -33,6 +39,19 @@ app.use('/api/mcp',    mcpRouter);
 app.use('/api/chat',   chatRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/logs',   logRouter);
+
+// ─── Static UI (production / npx mode) ────────────────────────────────────────
+if (IS_PROD) {
+  const publicDir = join(__dirname, 'public/browser');
+  if (existsSync(publicDir)) {
+    console.log(`[INIT] ${ts()} Serving static UI from: ${publicDir}`);
+    app.use(express.static(publicDir));
+    // SPA catch-all — must be AFTER all API routes
+    app.get('*', (_req, res) => res.sendFile(join(publicDir, 'index.html')));
+  } else {
+    console.warn(`[WARN] ${ts()} NODE_ENV=production but /public directory not found — UI not served. Run build:prod first.`);
+  }
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {

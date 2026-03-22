@@ -1,20 +1,36 @@
 {
-  "name": "blueorch-studio-web-backend",
+  "name": "@makeshkumar/blueorch-studio",
   "version": "1.0.0",
-  "description": "BlueOrch Studio Web Backend — Express bridge for the Angular UI",
+  "description": "BlueOrch Studio — Modular MCP Orchestrator with LLM chat, served as an npx command",
   "type": "module",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+  "bin": {
+    "blueorch": "./bin/cli.js"
   },
+  "files": [
+    "bin/",
+    "public/",
+    "*.js",
+    "*.json",
+    "!*.test.js",
+    "!package-lock.json"
+  ],
+  "scripts": {
+    "start": "NODE_ENV=production node server.js",
+    "dev": "NODE_ENV=development node --watch server.js",
+    "build:prod": "cd ../web-ui && ng build",
+    "publish:npm": "npm run build:prod && npm publish"
+  },
+  "keywords": ["mcp", "orchestrator", "llm", "ai", "blueorch"],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@google/genai": "^1.46.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "commander": "^14.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "express": "^4.18.0",
+    "open": "^11.0.0",
     "openai": "^6.32.0",
     "winston": "^3.19.0"
   }

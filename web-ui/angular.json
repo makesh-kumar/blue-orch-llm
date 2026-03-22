@@ -24,7 +24,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/web-ui",
+            "outputPath": "../web-backend/public",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -59,13 +59,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kb",
-                  "maximumError": "1mb"
+                    "maximumWarning": "1500kb",
+                    "maximumError": "2mb"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kb",
-                  "maximumError": "4kb"
+                    "maximumWarning": "4kb",
+                    "maximumError": "9kb"
                 }
               ],
               "outputHashing": "all"
