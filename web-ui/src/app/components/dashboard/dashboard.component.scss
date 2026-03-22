@@ -27,6 +27,13 @@
   padding-bottom: 1rem;
 }
 
+// ── Navbar logo ─────────────────────────────────────────────────────────────
+.navbar-logo {
+  width:          22px;
+  height:         22px;
+  vertical-align: middle;
+}
+
 // ── Dark mode toggle button ─────────────────────────────────────────────────
 .dark-mode-toggle {
   display: inline-flex;
