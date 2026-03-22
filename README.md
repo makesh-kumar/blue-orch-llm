@@ -109,7 +109,7 @@ The system lets you configure providers, connect MCP tool servers, explore your 
 ## Repository Structure
 
 ```
-blue-orch-llm/
+blueorch-studio/
 ├── blueorch-ui/               # Angular 17 frontend SPA
 │   ├── src/
 │   │   ├── app/
@@ -214,8 +214,8 @@ blue-orch-llm/
 Clone the repository and install dependencies for each module:
 
 ```bash
-git clone https://github.com/makesh-kumar/blue-orch-llm.git
-cd blue-orch-llm
+git clone https://github.com/makesh-kumar/blueorch-studio.git
+cd blueorch-studio
 
 # Install all modules
 (cd blueorch-ui && npm install)
