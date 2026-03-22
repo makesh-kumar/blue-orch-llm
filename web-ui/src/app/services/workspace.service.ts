@@ -24,8 +24,8 @@ export interface ProxyToolResponse {
 }
 
 // ─── LocalStorage keys ────────────────────────────────────────────────────────
-const LS_PATH    = 'blueorch_workspacePath';
-const LS_HOME    = 'blueorch_workspaceHomeDir';
+const LS_PATH    = 'blueorchstudio_workspacePath';
+const LS_HOME    = 'blueorchstudio_workspaceHomeDir';
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 

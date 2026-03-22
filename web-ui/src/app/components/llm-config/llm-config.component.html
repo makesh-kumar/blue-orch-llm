@@ -185,7 +185,7 @@
   <!-- ── Right: Registry Table ──────────────────────────────────────────────── -->
   <div class="col-xl-8 col-lg-7">
     <div class="card shadow-sm h-100">
-      <div class="card-header bg-white fw-semibold d-flex align-items-center">
+      <div class="card-header fw-semibold d-flex align-items-center">
         <i class="bi bi-hdd-stack me-2 text-primary"></i>
         Connected Providers
         <span class="badge bg-primary ms-2">{{ registeredProviders.length }}</span>
@@ -202,7 +202,7 @@
       <!-- Table -->
       <div *ngIf="registeredProviders.length > 0" class="table-responsive">
         <table class="table table-hover align-middle mb-0 registry-table">
-          <thead class="table-light">
+          <thead class="registry-thead">
             <tr>
               <th>Provider</th>
               <th>Model</th>
@@ -217,7 +217,7 @@
               <td>
                 <span class="d-flex align-items-center gap-2">
                   <i class="bi text-primary" [ngClass]="providerIconClass(entry.provider)"></i>
-                  <span class="fw-semibold">{{ providerLabel(entry.provider) }}</span>
+                  <span class="fw-semibold text-muted">{{ providerLabel(entry.provider) }}</span>
                   <span *ngIf="entry.provider === 'ollama' || entry.provider === 'lmstudio'"
                         class="badge bg-secondary">Local</span>
                 </span>
@@ -258,7 +258,7 @@
 
       <!-- Phase 3 hint -->
       <div *ngIf="registeredProviders.length > 0"
-           class="card-footer bg-white text-muted small py-2">
+           class="card-footer text-muted small py-2">
         <i class="bi bi-info-circle me-1"></i>
         Verified providers are available for selection in the <strong>Chat</strong> module.
       </div>

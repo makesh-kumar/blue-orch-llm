@@ -34,6 +34,6 @@ app.use('/api/logs',   logRouter);
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`[INIT] ${ts()} BlueOrch backend ready on port ${PORT}`);
+  console.log(`[INIT] ${ts()} BlueOrch Studio backend ready on port ${PORT}`);
   console.log(`[INIT] ${ts()} Routes: /api/mcp/* | /api/llm/* | /api/chat/* | /api/system/* | /api/logs/*`);
 });

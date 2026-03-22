@@ -125,16 +125,24 @@ router.post('/connect', async (req, res) => {
     console.log(`[INIT] ${ts()} Filesystem server: no path given — defaulting to ${homedir()}`);
   }
 
-  const label = resolvedArgs[0]
-    ? `${command} ${resolvedArgs[0].split('/').pop()}`
-    : command;
+  // ── Derive a human-readable label from command + args ─────────────────────
+  // Skip flag args (-y, --flag) to find the actual package/script name.
+  // For scoped npm packages (@scope/name) keep "scope/name" so context isn't lost.
+  // For plain path-like args (/usr/local/bin/tool) use only the last segment.
+  const pkgArg = resolvedArgs.find(a => !a.startsWith('-'));
+  let label = pkgArg ?? command;
+  if (label.startsWith('@')) {
+    label = label.slice(1);                 // "@playwright/mcp" → "playwright/mcp"
+  } else if (label.includes('/')) {
+    label = label.split('/').pop();         // plain path → last segment only
+  }
 
   console.log(`[INIT] ${ts()} Connecting | command: ${command} | args: ${args.join(' ')} | id: ${connectionId}`);
 
   const transport = new StdioClientTransport({ command, args: resolvedArgs, stderr: 'pipe' });
 
   const client = new Client(
-    { name: 'BlueOrch-Web-Bridge', version: '1.0.0' },
+    { name: 'BlueOrch-Studio-Web-Bridge', version: '1.0.0' },
     { capabilities: {} }
   );
 

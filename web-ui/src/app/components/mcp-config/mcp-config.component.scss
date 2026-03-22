@@ -59,6 +59,48 @@
   background-color: rgba(13, 110, 253, 0.1);
 }
 
+// ── Dark mode overrides ────────────────────────────────────────────────────
+:host-context(.dark) {
+  .card, .card-header, .card-footer, .card-body {
+    background-color: #161b27;
+    border-color: #2a3347;
+    color: #c9d1d9;
+  }
+
+  .list-group-item {
+    background-color: #161b27;
+    border-color: #2a3347;
+    color: #c9d1d9;
+
+    &.active {
+      --bs-list-group-active-bg: #0d6efd;
+      --bs-list-group-active-border-color: #0d6efd;
+      --bs-list-group-active-color: #fff;
+      background-color: #0d6efd !important;
+      border-color: #0d6efd !important;
+      color: #fff !important;
+    }
+
+    &:hover:not(.active) {
+      background-color: #1e2530;
+    }
+  }
+
+  .tool-header:hover {
+    background-color: rgba(13, 110, 253, 0.15);
+  }
+
+  .tool-active {
+    background-color: rgba(13, 110, 253, 0.3);
+    border-left: 3px solid #0d6efd;
+  }
+
+  // Tool detail expand area
+  .border-bottom {
+    border-color: #2a3347 !important;
+  }
+}
+
 // ── Response terminal ───────────────────────────────────────────────────────
 .response-terminal {
   background-color: #1e1e2e;

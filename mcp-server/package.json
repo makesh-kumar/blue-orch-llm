@@ -1,7 +1,7 @@
 {
-  "name": "blueorch-mcp-server",
+  "name": "blueorch-studio-mcp-server",
   "version": "1.0.0",
-  "description": "BlueOrch MCP Server - Product & Order Management",
+  "description": "BlueOrch Studio MCP Server - Product & Order Management",
   "type": "module",
   "main": "server.js",
   "scripts": {

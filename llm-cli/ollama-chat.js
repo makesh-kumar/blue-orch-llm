@@ -38,7 +38,7 @@ export async function startOllamaChat() {
     {
       role: 'system',
       content:
-        'You are BlueOrch, a helpful shopping assistant. ' +
+        'You are BlueOrch Studio, a helpful shopping assistant. ' +
         'Use the provided tools to answer questions about products, orders, and users accurately.',
     },
   ];

@@ -1,7 +1,7 @@
 {
-  "name": "blueorch-web-backend",
+  "name": "blueorch-studio-web-backend",
   "version": "1.0.0",
-  "description": "BlueOrch Web Backend — Express bridge for the Angular UI",
+  "description": "BlueOrch Studio Web Backend — Express bridge for the Angular UI",
   "type": "module",
   "main": "server.js",
   "scripts": {

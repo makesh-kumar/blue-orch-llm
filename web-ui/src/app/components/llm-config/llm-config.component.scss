@@ -28,3 +28,40 @@
     --bs-table-border-color: rgba(13, 110, 253, 0.15);
   }
 }
+
+.registry-thead th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6c757d;
+  border-bottom-width: 1px;
+}
+
+// ── Dark mode overrides ────────────────────────────────────────────────────
+:host-context(.dark) {
+  .card, .card-header, .card-footer, .card-body {
+    background-color: #161b27;
+    border-color: #2a3347;
+    color: #c9d1d9;
+  }
+
+  .registry-thead th {
+    background-color: #1e2530;
+    color: #8b949e;
+    border-color: #2a3347;
+  }
+
+  .registry-table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: #1e2530;
+    --bs-table-hover-bg: #1e2530;
+    --bs-table-border-color: #2a3347;
+    color: #c9d1d9;
+
+    tbody tr.table-primary {
+      --bs-table-bg: rgba(13, 110, 253, 0.15);
+    }
+  }
+}

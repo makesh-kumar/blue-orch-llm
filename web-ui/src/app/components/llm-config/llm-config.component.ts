@@ -4,9 +4,9 @@ import { LlmService, LlmRegistryEntry, LlmVerifyResponse } from '../../services/
 
 // ─── Per-provider localStorage key map ────────────────────────────────────────
 const API_KEY_STORAGE_MAP: Record<string, string> = {
-  gemini:  'BlueOrchGeminiApiKey',
-  openai:  'BlueOrchOpenAIApiKey',
-  claude:  'BlueOrchClaudeApiKey',
+  gemini:  'BlueOrchStudioGeminiApiKey',
+  openai:  'BlueOrchStudioOpenAIApiKey',
+  claude:  'BlueOrchStudioClaudeApiKey',
 };
 
 // ─── "Other" fallback for local providers before models are fetched ────────────

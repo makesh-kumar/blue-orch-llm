@@ -23,7 +23,7 @@ class SharedMCPClient {
     });
 
     this._client = new Client(
-      { name: 'BlueOrch-LLM-CLI', version: '1.0.0' },
+      { name: 'BlueOrch-Studio-LLM-CLI', version: '1.0.0' },
       { capabilities: {} }
     );
 

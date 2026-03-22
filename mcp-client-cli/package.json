@@ -1,7 +1,7 @@
 {
-  "name": "blueorch-mcp-client-cli",
+  "name": "blueorch-studio-mcp-client-cli",
   "version": "1.0.0",
-  "description": "BlueOrch MCP Client CLI - Controller for the MCP Server",
+  "description": "BlueOrch Studio MCP Client CLI - Controller for the MCP Server",
   "type": "module",
   "main": "client.js",
   "scripts": {

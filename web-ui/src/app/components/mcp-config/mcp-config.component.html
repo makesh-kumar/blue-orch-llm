@@ -42,7 +42,7 @@
           <input type="text"
                  class="form-control form-control-sm font-monospace"
                  [(ngModel)]="argsInput"
-                 placeholder="server path or name"
+                 placeholder="MCP server name or file path"
                  (keyup.enter)="connect()">
         </div>
         <button class="btn btn-primary w-100 mt-1"
@@ -59,7 +59,7 @@
 
     <!-- Active Connections List -->
     <div class="card shadow-sm connections-card">
-      <div class="card-header fw-semibold bg-white d-flex align-items-center">
+      <div class="card-header fw-semibold d-flex align-items-center">
         <i class="bi bi-hdd-network me-2 text-primary"></i>
         Active Servers
         <span class="badge bg-primary ms-auto">{{ connections.length }}</span>
@@ -112,7 +112,7 @@
 
       <!-- ── Tool Explorer ──────────────────────────────────────────────────── -->
       <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <div class="card-header fw-semibold d-flex align-items-center">
           <i class="bi bi-tools me-2 text-primary"></i>
           Tool Explorer
           <span class="badge bg-secondary ms-2">{{ tools.length }}</span>

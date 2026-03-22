@@ -56,7 +56,7 @@
                    (change)="toggleServer(conn)">
           </div>
           <i class="bi bi-hdd-stack text-primary small me-1"></i>
-          <span class="small fw-semibold text-truncate flex-1" [title]="conn.label">{{ conn.label }}</span>
+          <span class="small fw-semibold text-truncate flex-1" [bsTooltip]="conn.label" tooltipPlacement="right">{{ conn.label }}</span>
           <span class="badge bg-secondary small ms-1">{{ conn.tools.length }}</span>
         </div>
 
@@ -70,7 +70,7 @@
                    [(ngModel)]="tool.enabled">
             <label class="form-check-label small text-muted text-truncate d-block"
                    [for]="conn.connectionId + '-' + tool.name"
-                   [title]="tool.description || tool.name">
+                   [bsTooltip]="tool.description || tool.name" tooltipPlacement="right">
               {{ tool.name }}
             </label>
           </div>
@@ -132,9 +132,9 @@
 
         <!-- Workspace context only in project mode -->
         <div class="context-strip" *ngIf="isProjectModeActive">
-          <span class="context-item" [title]="workspaceService.currentPath">
+          <span class="context-item" [bsTooltip]="workspaceService.currentPath" tooltipPlacement="bottom">
             <i class="bi bi-folder2-open text-primary"></i>
-            <span class="font-monospace context-path" [title]="workspaceService.currentPath">{{ truncatePath(workspaceService.currentPath) }}</span>
+            <span class="font-monospace context-path">{{ truncatePath(workspaceService.currentPath) }}</span>
           </span>
 
           <ng-container *ngIf="(workspaceService.contextFiles$ | async)?.length as fc">
@@ -145,7 +145,7 @@
 
           <button class="btn btn-sm btn-outline-primary py-0 px-2"
                   (click)="navigateToWorkspace.emit()"
-                  title="Go to Workspace tab to manage files">
+                  [bsTooltip]="'Go to Workspace tab to manage files'" tooltipPlacement="bottom">
             <i class="bi bi-folder-tree me-1"></i>Change
           </button>
         </div>
@@ -197,7 +197,7 @@
               <button class="msg-copy-btn"
                       [class.msg-copy-btn--copied]="copiedTimestamp === msg.timestamp"
                       (click)="copyResponse(msg)"
-                      title="Copy response">
+                      [bsTooltip]="'Copy response'" tooltipPlacement="top">
                 <i class="bi" [ngClass]="copiedTimestamp === msg.timestamp ? 'bi-check2' : 'bi-clipboard'"></i>
               </button>
             </div>
@@ -229,7 +229,7 @@
         <span class="session-cost-value ms-1">${{ totalSessionCost.toFixed(4) }}</span>
       </span>
       <button class="btn btn-sm session-cost-reset"
-              title="Reset session cost"
+              [bsTooltip]="'Reset session cost'" tooltipPlacement="left"
               (click)="resetSessionCost()"
               [disabled]="totalSessionCost === 0">
         <i class="bi bi-arrow-counterclockwise"></i>
@@ -258,7 +258,7 @@
         <button class="btn btn-danger px-3"
                 *ngIf="isThinking"
                 (click)="stopGeneration()"
-                title="Stop current response">
+                [bsTooltip]="'Stop current response'" tooltipPlacement="top">
           <i class="bi bi-stop-fill"></i>
         </button>
 

@@ -137,7 +137,7 @@ async function getUserDashboard({ email }) {
 // ─── Server Setup ──────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'blueorch-mcp-server', version: '1.0.0' },
+  { name: 'blueorch-studio-mcp-server', version: '1.0.0' },
   { capabilities: { tools: {} } }
 );
 
@@ -228,10 +228,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function main() {
   const ts = new Date().toISOString();
-  console.log(`[INIT] ${ts} BlueOrch MCP Server Starting...`);
+  console.log(`[INIT] ${ts} BlueOrch Studio MCP Server Starting...`);
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log(`[SUCCESS] ${ts} BlueOrch MCP Server running on stdio`);
+  console.log(`[SUCCESS] ${ts} BlueOrch Studio MCP Server running on stdio`);
 }
 
 main().catch(err => {

@@ -8,6 +8,7 @@ import { MARKED_OPTIONS, MarkdownModule, MarkedOptions, MarkedRenderer } from 'n
 import hljs from 'highlight.js';
 
 import { AppComponent } from './app.component';
+import { BsTooltipDirective } from './directives/bs-tooltip.directive';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { McpConfigComponent } from './components/mcp-config/mcp-config.component';
 import { LlmConfigComponent } from './components/llm-config/llm-config.component';
@@ -80,6 +81,7 @@ export function markedOptionsFactory(): MarkedOptions {
 @NgModule({
   declarations: [
     AppComponent,
+    BsTooltipDirective,
     DashboardComponent,
     McpConfigComponent,
     LlmConfigComponent,

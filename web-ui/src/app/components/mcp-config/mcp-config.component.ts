@@ -8,8 +8,8 @@ import { McpService, McpTool, ActiveConnection, ConnectResponse, LogsResponse } 
 })
 export class McpConfigComponent implements OnInit, OnDestroy {
   // ── Connection state
-  command = 'node';
-  argsInput = '../mcp-server/server.js';
+  command = 'npx';
+  argsInput = '';
   connections: ActiveConnection[] = [];
   selectedConnectionId: string | null = null;
 

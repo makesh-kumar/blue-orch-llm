@@ -14,7 +14,7 @@ export class DashboardComponent {
 
   constructor() {
     console.log(`[INIT] ${new Date().toISOString()} DashboardComponent initialized`);
-    const saved = localStorage.getItem('blueorch-dark-mode');
+    const saved = localStorage.getItem('blueorchstudio-dark-mode');
     this.isDarkMode = saved === 'true';
     this._applyTheme();
   }
@@ -28,7 +28,7 @@ export class DashboardComponent {
 
   toggleDarkMode(): void {
     this.isDarkMode = !this.isDarkMode;
-    localStorage.setItem('blueorch-dark-mode', String(this.isDarkMode));
+    localStorage.setItem('blueorchstudio-dark-mode', String(this.isDarkMode));
     this._applyTheme();
     console.log(`[SUCCESS] ${new Date().toISOString()} DashboardComponent: dark mode ${this.isDarkMode ? 'ON' : 'OFF'}`);
   }

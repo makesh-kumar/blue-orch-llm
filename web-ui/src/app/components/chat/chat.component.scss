@@ -506,6 +506,24 @@
   }
 }
 
+// ── Dark mode overrides for mode-segment ─────────────────────────────────────
+:host-context(.dark) .mode-segment {
+  background-color: #1e2530;
+  border-color: #3a4255;
+
+  .mode-btn {
+    color: #9ca3b0;
+
+    &:hover { color: #6ee7b7; }
+  }
+
+  .btn-check:checked + .mode-btn-expert,
+  .btn-check:checked + .mode-btn-project {
+    background-color: #198754;
+    color: #fff;
+  }
+}
+
 
 // Floats above the input bar, does not shift any layout
 .chat-error-toast {
