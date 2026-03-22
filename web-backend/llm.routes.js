@@ -196,6 +196,73 @@ router.get('/active', (_req, res) => {
   return res.json({ id, provider, model, latency, verifiedAt });
 });
 
+// ─── POST /api/llm/models ─────────────────────────────────────────────────────
+// Body:    { provider, apiKey }
+// Returns: { models: [{ label, value }] }
+// Fetches the available models for cloud providers (gemini, openai, claude).
+router.post('/models', async (req, res) => {
+  const { provider, apiKey } = req.body;
+  if (!provider || !apiKey) {
+    return res.status(400).json({ error: 'provider and apiKey are required' });
+  }
+  console.log(`[INIT] ${ts()} Fetching models from provider API | provider: ${provider}`);
+  try {
+    let models = [];
+
+    if (provider === 'gemini') {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+      );
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error?.message ?? `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      models = (data.models ?? [])
+        .filter(m => (m.supportedGenerationMethods ?? []).includes('generateContent'))
+        .map(m => ({
+          label: m.displayName ?? m.name.split('/').pop(),
+          value: m.name.split('/').pop(),
+        }));
+
+    } else if (provider === 'openai') {
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey });
+      const modelsRes = await openai.models.list();
+      models = (modelsRes.data ?? [])
+        .filter(m => /^(gpt|o1|o3|o4|chatgpt)/.test(m.id))
+        .sort((a, b) => b.created - a.created)
+        .map(m => ({ label: m.id, value: m.id }));
+
+    } else if (provider === 'claude') {
+      const resp = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error?.message ?? `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      models = (data.data ?? []).map(m => ({
+        label: m.display_name ?? m.id,
+        value: m.id,
+      }));
+
+    } else {
+      return res.status(400).json({ error: `Model listing not supported for provider: ${provider}` });
+    }
+
+    console.log(`[SUCCESS] ${ts()} Models fetched | provider: ${provider} | ${models.length} model(s)`);
+    return res.json({ models });
+  } catch (err) {
+    console.error(`[ERROR] ${ts()} Failed to fetch models | provider: ${provider} | ${err.message}`);
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/llm/ollama/models ───────────────────────────────────────────────
 // Query: ?baseUrl=http://localhost:11434
 // Returns the list of locally pulled models from Ollama.

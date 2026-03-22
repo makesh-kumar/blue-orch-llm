@@ -2,27 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { LlmService, LlmRegistryEntry, LlmVerifyResponse } from '../../services/llm.service';
 
-// ─── LLM model map ─────────────────────────────────────────────────────────────
-const MODEL_MAP: Record<string, { label: string; value: string }[]> = {
-  gemini: [
-    { label: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash' },
-    { label: 'Gemini 1.5 Pro',   value: 'gemini-1.5-pro' },
-    {label: 'Gemini 2.0 Flash',value: 'gemini-2.0-flash'},
-    {label: 'Gemini 2.0 Flash Lite',value: 'gemini-2.0-flash-lite'},
-    {label: 'Gemini 2.5 Flash Lite',value: 'gemini-2.5-flash-lite'},
-    { label: 'Other',            value: 'other' },
-  ],
-  openai: [
-    { label: 'GPT-4o',      value: 'gpt-4o' },
-    { label: 'GPT-4o Mini', value: 'gpt-4o-mini' },
-    { label: 'Other',       value: 'other' },
-  ],
-  claude: [
-    { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20241022' },
-    { label: 'Other',             value: 'other' },
-  ],  lmstudio: [
-    { label: 'Other (Enter Model ID)', value: 'other' },
-  ],};
+// ─── Per-provider localStorage key map ────────────────────────────────────────
+const API_KEY_STORAGE_MAP: Record<string, string> = {
+  gemini:  'BlueOrchGeminiApiKey',
+  openai:  'BlueOrchOpenAIApiKey',
+  claude:  'BlueOrchClaudeApiKey',
+};
+
+// ─── "Other" fallback for local providers before models are fetched ────────────
+const OTHER_OPTION = { label: 'Other (Enter Model ID)', value: 'other' };
 
 @Component({
   selector: 'app-llm-config',
@@ -42,6 +30,10 @@ export class LlmConfigComponent implements OnInit {
   lmStudioModels: { id: string }[] = [];
   lmStudioFetchStatus: 'idle' | 'fetching' | 'done' | 'error' = 'idle';
 
+  // ── Cloud models (Gemini / OpenAI / Claude)
+  cloudFetchStatus: 'idle' | 'fetching' | 'done' | 'error' = 'idle';
+  cloudFetchError = '';
+
   // ── Verify status
   verifyStatus: 'idle' | 'verifying' | 'success' | 'error' = 'idle';
   verifyLatency: number | null = null;
@@ -54,13 +46,12 @@ export class LlmConfigComponent implements OnInit {
     private llmService: LlmService,
     private fb: FormBuilder,
   ) {
-    const keyFromLocalStorage = localStorage.getItem('gKey') ?? '';
     console.log(`[INIT] ${new Date().toISOString()} LlmConfigComponent initialized`);
     this.llmForm = this.fb.group({
       provider:    ['', Validators.required],
       model:       ['', Validators.required],
       customModel: [''],
-      apiKey:      [keyFromLocalStorage, Validators.required],
+      apiKey:      ['', Validators.required],
       baseUrl:     ['http://localhost:11434'],
     });
   }
@@ -85,15 +76,19 @@ export class LlmConfigComponent implements OnInit {
   // ── Provider change ────────────────────────────────────────────────────────
   onProviderChange(): void {
     const provider = this.llmForm.get('provider')!.value as string;
-    this.modelOptions = MODEL_MAP[provider] ?? [];
+    this.modelOptions = [];
     this.llmForm.patchValue({ model: '', customModel: '' });
     this.verifyStatus = 'idle';
     this.verifyLatency = null;
     this.verifyError = '';
+    this.cloudFetchStatus = 'idle';
+    this.cloudFetchError = '';
 
     const apiKeyCtrl = this.llmForm.get('apiKey')!;
     if (provider === 'ollama' || provider === 'lmstudio') {
       apiKeyCtrl.clearValidators();
+      this.llmForm.patchValue({ apiKey: '' });
+      this.modelOptions = [OTHER_OPTION];
       if (provider === 'ollama') {
         this.llmForm.patchValue({ baseUrl: 'http://localhost:11434' });
         this.ollamaModels = [];
@@ -105,6 +100,9 @@ export class LlmConfigComponent implements OnInit {
       }
     } else {
       apiKeyCtrl.setValidators([Validators.required]);
+      const storageKey = API_KEY_STORAGE_MAP[provider];
+      const savedKey   = storageKey ? (localStorage.getItem(storageKey) ?? '') : '';
+      this.llmForm.patchValue({ apiKey: savedKey });
     }
     apiKeyCtrl.updateValueAndValidity();
     console.log(`[INIT] ${new Date().toISOString()} Provider changed | provider: ${provider}`);
@@ -124,6 +122,35 @@ export class LlmConfigComponent implements OnInit {
 
   get isLocalProvider(): boolean {
     return this.isOllamaProvider || this.isLmStudioProvider;
+  }
+
+  get isCloudProvider(): boolean {
+    const p = this.llmForm.get('provider')!.value as string;
+    return p === 'gemini' || p === 'openai' || p === 'claude';
+  }
+
+  // ── Fetch cloud provider models (Gemini / OpenAI / Claude) ──────────────────
+  fetchCloudModels(): void {
+    const { provider, apiKey } = this.llmForm.value as { provider: string; apiKey: string };
+    const trimmedKey = apiKey?.trim() ?? '';
+    if (!trimmedKey) return;
+
+    this.cloudFetchStatus = 'fetching';
+    this.cloudFetchError = '';
+    console.log(`[INIT] ${new Date().toISOString()} fetchCloudModels() | provider: ${provider}`);
+
+    this.llmService.fetchCloudModels(provider, trimmedKey).subscribe({
+      next: (res) => {
+        this.modelOptions = [...res.models, OTHER_OPTION];
+        this.cloudFetchStatus = 'done';
+        console.log(`[SUCCESS] ${new Date().toISOString()} fetchCloudModels() | ${res.models.length} models`);
+      },
+      error: (err) => {
+        this.cloudFetchStatus = 'error';
+        this.cloudFetchError = err.error?.error ?? 'Failed to fetch models. Check your API key.';
+        console.log(`[ERROR] ${new Date().toISOString()} fetchCloudModels() failed | ${this.cloudFetchError}`);
+      },
+    });
   }
 
   // ── Fetch Ollama models ────────────────────────────────────────────────────
@@ -221,6 +248,12 @@ export class LlmConfigComponent implements OnInit {
       next: (res: LlmVerifyResponse) => {
         this.verifyStatus = 'success';
         this.verifyLatency = res.latency;
+        // Persist API key for this provider
+        const storageKey = API_KEY_STORAGE_MAP[provider];
+        if (storageKey && apiKey) {
+          localStorage.setItem(storageKey, apiKey);
+          console.log(`[SUCCESS] ${new Date().toISOString()} API key saved to localStorage | key: ${storageKey}`);
+        }
         // Add to local registry list
         this.registeredProviders.push({
           id: res.id,

@@ -91,5 +91,12 @@ export class LlmService {
       .get<{ models: { id: string }[] }>(url)
       .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} LlmService.fetchLmStudioModels() | ${res.models.length} models`)));
   }
+
+  fetchCloudModels(provider: string, apiKey: string): Observable<{ models: { label: string; value: string }[] }> {
+    console.log(`[INIT] ${new Date().toISOString()} LlmService.fetchCloudModels() | provider: ${provider}`);
+    return this.http
+      .post<{ models: { label: string; value: string }[] }>(`${this.apiUrl}/models`, { provider, apiKey })
+      .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} LlmService.fetchCloudModels() | ${res.models.length} models`)));
+  }
 }
 

@@ -17,7 +17,7 @@
                   [class.is-invalid]="llmForm.get('provider')!.invalid && llmForm.get('provider')!.touched">
             <option value="" disabled>Select a provider...</option>
             <option value="gemini">Gemini (Google)</option>
-            <option value="openai">OpenAI</option>
+            <option value="openai">GPT (OpenAI)</option>
             <option value="claude">Claude (Anthropic)</option>
             <option value="ollama">Ollama (Local)</option>
             <option value="lmstudio">LM Studio (Local)</option>
@@ -37,9 +37,46 @@
           </div>
         </div>
 
+        <!-- API Key (cloud providers — shown here so user can fetch models next) -->
+        <div class="mb-2" *ngIf="isCloudProvider">
+          <label class="form-label fw-semibold small mb-1">API Key</label>
+          <input type="password"
+                 class="form-control font-monospace"
+                 formControlName="apiKey"
+                 placeholder="••••••••••••••••••••••••••••••••"
+                 autocomplete="current-password"
+                 [class.is-invalid]="llmForm.get('apiKey')!.invalid && llmForm.get('apiKey')!.touched">
+          <div class="invalid-feedback">API key is required.</div>
+        </div>
+
         <!-- Model -->
         <div class="mb-2">
           <label class="form-label fw-semibold small mb-1">Model</label>
+
+          <!-- Cloud providers: Fetch button + status -->
+          <div *ngIf="isCloudProvider" class="mb-1">
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      (click)="fetchCloudModels()"
+                      [disabled]="cloudFetchStatus === 'fetching' || !llmForm.get('apiKey')!.value?.trim()">
+                <span *ngIf="cloudFetchStatus === 'fetching'"
+                      class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <i *ngIf="cloudFetchStatus !== 'fetching'" class="bi bi-cloud-download me-1"></i>
+                {{ cloudFetchStatus === 'fetching' ? 'Fetching...' : 'Fetch Available Models' }}
+              </button>
+              <span *ngIf="!llmForm.get('apiKey')!.value?.trim() && cloudFetchStatus === 'idle'"
+                    class="small text-muted align-self-center">
+                <i class="bi bi-info-circle me-1"></i>Enter your API key above first
+              </span>
+              <span *ngIf="cloudFetchStatus === 'done'" class="small text-success align-self-center">
+                <i class="bi bi-check-circle me-1"></i>{{ modelOptions.length - 1 }} model(s) available
+              </span>
+            </div>
+            <div *ngIf="cloudFetchStatus === 'error'" class="mt-1 small text-danger">
+              <i class="bi bi-exclamation-circle me-1"></i>{{ cloudFetchError }}
+            </div>
+          </div>
 
           <!-- LM Studio: Fetch button + status -->
           <div *ngIf="isLmStudioProvider" class="d-flex gap-2 mb-1">
@@ -98,18 +135,6 @@
                  placeholder="e.g. gemini-2.0-flash"
                  [class.is-invalid]="llmForm.get('customModel')!.invalid && llmForm.get('customModel')!.touched">
           <div class="invalid-feedback">Please enter a custom model ID.</div>
-        </div>
-
-        <!-- API Key (hidden for Ollama and LM Studio) -->
-        <div class="mb-4" *ngIf="!isLocalProvider">
-          <label class="form-label fw-semibold small mb-1">API Key</label>
-          <input type="password"
-                 class="form-control font-monospace"
-                 formControlName="apiKey"
-                 placeholder="••••••••••••••••••••••••••••••••"
-                 autocomplete="current-password"
-                 [class.is-invalid]="llmForm.get('apiKey')!.invalid && llmForm.get('apiKey')!.touched">
-          <div class="invalid-feedback">API key is required.</div>
         </div>
 
         <!-- Verify & Save Button -->
