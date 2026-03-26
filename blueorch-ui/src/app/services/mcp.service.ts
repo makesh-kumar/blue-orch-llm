@@ -21,6 +21,7 @@ export interface ActiveConnection {
   label: string;
   command: string;
   args: string[];
+  env: Record<string, string>;
   toolCount: number;
 }
 
@@ -29,6 +30,7 @@ export interface ConnectResponse {
   label: string;
   command: string;
   args: string[];
+  env: Record<string, string>;
   tools: McpTool[];
 }
 
@@ -58,10 +60,11 @@ export class McpService {
     console.log(`[INIT] ${new Date().toISOString()} McpService initialized | apiUrl: ${this.apiUrl}`);
   }
 
-  connect(command: string, args: string[]): Observable<ConnectResponse> {
-    console.log(`[INIT] ${new Date().toISOString()} McpService.connect() | command: ${command} | args: ${args.join(' ')}`);
+  connect(command: string, args: string[], env: Record<string, string> = {}): Observable<ConnectResponse> {
+    const envKeys = Object.keys(env).join(',') || 'none';
+    console.log(`[INIT] ${new Date().toISOString()} McpService.connect() | command: ${command} | args: ${args.join(' ')} | envKeys: ${envKeys}`);
     return this.http
-      .post<ConnectResponse>(`${this.apiUrl}/connect`, { command, args })
+      .post<ConnectResponse>(`${this.apiUrl}/connect`, { command, args, env })
       .pipe(tap(res => console.log(`[SUCCESS] ${new Date().toISOString()} McpService.connect() | id: ${res.connectionId}`)));
   }
 

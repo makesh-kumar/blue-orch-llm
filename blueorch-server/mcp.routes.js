@@ -103,15 +103,18 @@ function resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, input
 }
 
 // ─── POST /api/mcp/connect ────────────────────────────────────────────────────
-// Body: { command: string, args: string[] }
+// Body: { command: string, args: string[], env?: Record<string, string> }
 router.post('/connect', async (req, res) => {
-  const { command, args } = req.body;
+  const { command, args, env } = req.body;
 
   if (!command || typeof command !== 'string') {
     return res.status(400).json({ error: '"command" (string) is required, e.g. "node" or "uvx"' });
   }
   if (!Array.isArray(args)) {
     return res.status(400).json({ error: '"args" (array of strings) is required' });
+  }
+  if (env !== undefined && (typeof env !== 'object' || Array.isArray(env))) {
+    return res.status(400).json({ error: '"env" must be a plain object of string key-value pairs' });
   }
 
   const connectionId = randomUUID();
@@ -137,9 +140,18 @@ router.post('/connect', async (req, res) => {
     label = label.split('/').pop();         // plain path → last segment only
   }
 
-  console.log(`[INIT] ${ts()} Connecting | command: ${command} | args: ${args.join(' ')} | id: ${connectionId}`);
+  // ── Merge caller-supplied env with the current process env ──────────────
+  // Keeping process.env ensures PATH and system vars are available to the child.
+  const mergedEnv = (env && Object.keys(env).length > 0)
+    ? { ...process.env, ...env }
+    : undefined;
 
-  const transport = new StdioClientTransport({ command, args: resolvedArgs, stderr: 'pipe' });
+  console.log(`[INIT] ${ts()} Connecting | command: ${command} | args: ${args.join(' ')} | id: ${connectionId} | extraEnvKeys: ${env ? Object.keys(env).join(',') : 'none'}`);
+
+  const transportOptions = { command, args: resolvedArgs, stderr: 'pipe' };
+  if (mergedEnv) transportOptions.env = mergedEnv;
+
+  const transport = new StdioClientTransport(transportOptions);
 
   const client = new Client(
     { name: 'BlueOrch-Studio-Web-Bridge', version: '1.0.0' },
@@ -158,6 +170,7 @@ router.post('/connect', async (req, res) => {
       tools,
       command,
       args: resolvedArgs,
+      env: env ?? {},
       label,
       logs,
       connectedAt: ts(),
@@ -191,6 +204,7 @@ router.get('/clients', (_req, res) => {
     label: entry.label,
     command: entry.command,
     args: entry.args,
+    env: entry.env ?? {},
     toolCount: entry.tools.length,
     connectedAt: entry.connectedAt,
   }));

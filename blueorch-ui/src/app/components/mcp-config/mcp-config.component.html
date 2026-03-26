@@ -45,6 +45,48 @@
                  placeholder="MCP server name or file path"
                  (keyup.enter)="connect()">
         </div>
+
+        <!-- Environment Variables -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center mb-1">
+            <label class="form-label small text-muted mb-0 me-auto">
+              Env Variables
+              <span class="fw-normal text-muted">(optional)</span>
+            </label>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1"
+                    type="button"
+                    (click)="addEnvVar()"
+                    title="Add environment variable">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+
+          <div *ngFor="let ev of envVars; let i = index"
+               class="d-flex gap-1 mb-1 align-items-center">
+            <input type="text"
+                   class="form-control form-control-sm font-monospace"
+                   style="width:40%"
+                   [(ngModel)]="ev.key"
+                   placeholder="KEY"
+                   [attr.aria-label]="'Env key ' + i">
+            <input type="text"
+                   class="form-control form-control-sm font-monospace"
+                   style="width:55%"
+                   [(ngModel)]="ev.value"
+                   placeholder="value"
+                   [attr.aria-label]="'Env value ' + i">
+            <button class="btn btn-sm text-danger p-0 flex-shrink-0"
+                    type="button"
+                    (click)="removeEnvVar(i)"
+                    title="Remove">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+
+          <div *ngIf="envVars.length === 0" class="text-muted" style="font-size:0.72rem;">
+            No env vars — click <i class="bi bi-plus-lg"></i> to add
+          </div>
+        </div>
         <button class="btn btn-primary w-100 mt-1"
                 (click)="connect()"
                 [disabled]="isConnecting">

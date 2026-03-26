@@ -10,6 +10,7 @@ export class McpConfigComponent implements OnInit, OnDestroy {
   // ── Connection state
   command = 'npx';
   argsInput = '';
+  envVars: Array<{ key: string; value: string }> = [];
   connections: ActiveConnection[] = [];
   selectedConnectionId: string | null = null;
 
@@ -92,20 +93,35 @@ export class McpConfigComponent implements OnInit, OnDestroy {
     console.log(`[INIT] ${new Date().toISOString()} Log polling ${ this.logsPaused ? 'paused' : 'resumed'}`);
   }
 
+  // ── Env vars helpers ─────────────────────────────────────────────────────
+  addEnvVar(): void {
+    this.envVars.push({ key: '', value: '' });
+  }
+
+  removeEnvVar(index: number): void {
+    this.envVars.splice(index, 1);
+  }
+
   // ── Connect ──────────────────────────────────────────────────────────────
   connect(): void {
     if (!this.command.trim()) { return; }
     const argsArray = this.argsInput.trim().split(/\s+/).filter(a => a.length > 0);
+    const env: Record<string, string> = {};
+    this.envVars.forEach(pair => {
+      const k = pair.key.trim();
+      if (k) { env[k] = pair.value; }
+    });
     this.isConnecting = true;
     this.dismissError();
 
-    this.mcpService.connect(this.command.trim(), argsArray).subscribe({
+    this.mcpService.connect(this.command.trim(), argsArray, env).subscribe({
       next: (res: ConnectResponse) => {
         this.connections.push({
           connectionId: res.connectionId,
           label: res.label,
           command: res.command,
           args: res.args,
+          env: res.env ?? {},
           toolCount: res.tools.length,
         });
         this.isConnecting = false;
