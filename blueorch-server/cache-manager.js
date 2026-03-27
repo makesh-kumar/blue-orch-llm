@@ -155,11 +155,14 @@ export async function getOrCreateCache(apiKey, model, workspacePath, systemConte
   }
 
   // 2 ─ Build compact workspace snapshot (signature-only: names, no content)
-  const snapshot    = buildWorkspaceSnapshot(workspacePath);
-  const contextText = `${systemContext}\n\n${snapshot}`;
+  const snapshot = buildWorkspaceSnapshot(workspacePath);
 
-  if (contextText.length < MIN_CACHE_CHARS) {
-    console.log(`[SUCCESS] ${ts()} CacheManager: context too small (${contextText.length} chars) — skipping cache`);
+  // Only measure snapshot size — systemInstruction is NOT stored inside the cache.
+  // Storing it in the cache would cause stale system instructions on cache hits
+  // (e.g., wrong workspace path when the user switches workspaces).
+  // We pass systemInstruction fresh on every generateContent() call alongside cachedContent.
+  if (snapshot.length < MIN_CACHE_CHARS) {
+    console.log(`[SUCCESS] ${ts()} CacheManager: snapshot too small (${snapshot.length} chars) — skipping cache`);
     return null;
   }
 
@@ -168,10 +171,10 @@ export async function getOrCreateCache(apiKey, model, workspacePath, systemConte
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey });
 
+    // ⚠️  No systemInstruction in the cache — passed fresh per request in handleGemini().
     const cache = await ai.caches.create({
       model,
       config: {
-        systemInstruction: systemContext,
         contents: [{ role: 'user', parts: [{ text: snapshot }] }],
         ttl: `${CACHE_TTL_SECONDS}s`,
       },

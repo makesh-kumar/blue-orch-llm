@@ -7,7 +7,8 @@ import { mapProviderUsage } from './usage-normalizer.js';
 
 const router = Router();
 const ts = () => new Date(Date.now() + (5 * 60 + 30) * 60000).toISOString().replace('Z', '+05:30');
-const PATH_KEY_PATTERN = /(path|file|dir|directory|folder|filename)$/i;
+// Matches both singular and plural path-like argument keys, e.g. "path", "paths", "file", "files"
+const PATH_KEY_PATTERN = /(paths?|files?|dir|directory|folder|filename)$/i;
 const PATH_TEXT_PATTERN = /(absolute path|relative path|file path|directory path|folder path|workspace path|file name|filename|directory|folder|path)/i;
 
 // ─── In-memory chat session (Phase 3: single session) ─────────────────────────
@@ -44,14 +45,46 @@ function toGeminiSchema(schema) {
 
 /** Extract readable text from an MCP callTool result object.
  * Applies token-safety truncation if the output exceeds 10 000 chars. */
+/** Extract readable text from an MCP callTool result object.
+ * Handles all standard MCP content types: text, resource (nested text/blob), image.
+ * Surfaces isError results clearly so the LLM knows the call failed.
+ * Applies token-safety truncation if output exceeds 10 000 chars. */
 function extractToolText(result) {
-  // MCP result: { content: [{ type: 'text', text: '...' }] }
+  // ── Error response ──────────────────────────────────────────────────────────
+  // MCP spec: { isError: true, content: [...] }
+  // Surface the error message with a clear prefix so the LLM can reason about it.
+  if (result?.isError === true) {
+    const errText = (result.content ?? [])
+      .map(c => c.text ?? c.resource?.text ?? JSON.stringify(c))
+      .join('\n')
+      .trim();
+    return `[TOOL ERROR] ${errText || 'The tool reported an error but gave no message.'}`;
+  }
+
+  // ── Normal response ─────────────────────────────────────────────────────────
+  // MCP content item shapes:
+  //   { type: 'text',     text: '...' }
+  //   { type: 'resource', resource: { uri, text?, blob? } }
+  //   { type: 'image',    data, mimeType }  ← not readable, skip
   let text;
   if (Array.isArray(result?.content)) {
-    text = result.content.map(c => c.text ?? JSON.stringify(c)).join('\n');
+    text = result.content
+      .map(c => {
+        if (c.type === 'text')     return c.text ?? '';
+        if (c.type === 'resource') return c.resource?.text ?? JSON.stringify(c.resource ?? c);
+        // image or unknown — skip inline, note its presence
+        return `[Non-text content: type=${c.type}]`;
+      })
+      .join('\n');
   } else {
     text = JSON.stringify(result ?? '');
   }
+
+  // ── Empty guard ─────────────────────────────────────────────────────────────
+  if (!text || !text.trim()) {
+    return '[Tool returned no content. The path may be a directory, the file may be empty, or access may be denied.]';
+  }
+
   return truncateIfLarge(text);
 }
 
@@ -108,8 +141,22 @@ function getPathArgumentKeys(toolArgs, inputSchema) {
   }
 
   for (const [key, value] of Object.entries(toolArgs ?? {})) {
-    if (typeof value !== 'string') continue;
-    if (isPathLikeSchemaProperty(key, schemaProperties[key])) {
+    const isStr = typeof value === 'string';
+    // e.g. read_multiple_files sends { paths: ["file1.js", "file2.js"] }
+    const isStrArr = Array.isArray(value) && value.length > 0 && typeof value[0] === 'string';
+    if (!isStr && !isStrArr) continue;
+
+    if (isStrArr) {
+      // The MCP schema for array params says type:'array', which isPathLikeSchemaProperty
+      // rejects. Bypass the type check and match solely on key name / description.
+      const normalizedKey = (key ?? '').replace(/[_-]/g, '').toLowerCase();
+      if (normalizedKey === 'content') continue;
+      const sp = schemaProperties[key];
+      const descText = [sp?.description, sp?.title].filter(Boolean).join(' ');
+      if (PATH_KEY_PATTERN.test(normalizedKey) || PATH_TEXT_PATTERN.test(descText)) {
+        keys.add(key);
+      }
+    } else if (isPathLikeSchemaProperty(key, schemaProperties[key])) {
       keys.add(key);
     }
   }
@@ -157,10 +204,22 @@ function resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, input
   let didRewrite = false;
 
   for (const key of keysToResolve) {
-    const nextValue = resolveWorkspacePathValue(finalArgs[key], activeWorkspacePath);
-    if (nextValue !== undefined && nextValue !== finalArgs[key]) {
-      finalArgs[key] = nextValue;
-      didRewrite = true;
+    const val = finalArgs[key];
+    if (Array.isArray(val)) {
+      // e.g. read_multiple_files: { paths: ["Drawing Board/script.js", ...] }
+      const resolvedArr = val.map(item =>
+        typeof item === 'string' ? resolveWorkspacePathValue(item, activeWorkspacePath) : item
+      );
+      if (resolvedArr.some((v, i) => v !== val[i])) {
+        finalArgs[key] = resolvedArr;
+        didRewrite = true;
+      }
+    } else {
+      const nextValue = resolveWorkspacePathValue(val, activeWorkspacePath);
+      if (nextValue !== undefined && nextValue !== val) {
+        finalArgs[key] = nextValue;
+        didRewrite = true;
+      }
     }
   }
 
@@ -203,10 +262,12 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
   const config = {};
 
   if (cacheName) {
-    // Project Mode: system prompt is already inside the cache — do NOT repeat it
+    // The cache contains only the workspace file-tree snapshot (no systemInstruction).
+    // Always inject the current systemInstruction so it reflects the latest workspace
+    // path and context files — never stale from a previous cache-creation call.
     config.cachedContent = cacheName;
+    if (systemContext) config.systemInstruction = systemContext;
   } else if (systemContext) {
-    // Expert Mode: send system prompt directly
     config.systemInstruction = systemContext;
   }
 
@@ -215,6 +276,10 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
   }
 
   // ── Agentic tool loop ────────────────────────────────────────────────────────
+  // Safety cap: prevent infinite loops if the model keeps calling tools
+  const MAX_TOOL_ROUNDS = 10;
+  let toolRounds = 0;
+
   while (true) {
     ensureNotCancelled();
     const response = await withAbort(
@@ -226,11 +291,47 @@ async function handleGemini({ apiKey, model, message, history, toolDefs, execute
     const funcCalls = parts.filter(p => p.functionCall);
 
     if (funcCalls.length === 0) {
-      const text = parts.find(p => p.text)?.text ?? '';
+      let text = parts.find(p => p.text)?.text ?? '';
+
+      // ── Empty-response recovery ───────────────────────────────────────────
+      // Gemini sometimes returns an empty text part after executing tool calls
+      // (especially after list_directory) instead of synthesising the results.
+      // When this happens and tools have been used, nudge the model once to
+      // produce a proper summary rather than silently returning an empty reply.
+      if (!text.trim() && toolsUsed.length > 0) {
+        console.log(`[INIT] ${ts()} handleGemini() empty response after tools — sending synthesis nudge`);
+        contents.push({ role: 'model', parts: [{ text: '' }] });
+        contents.push({
+          role: 'user',
+          parts: [{ text: 'Based on the tool results above, please provide a complete and helpful answer to my original question.' }],
+        });
+        ensureNotCancelled();
+        const retryResponse = await withAbort(
+          ai.models.generateContent({ model, contents, config }),
+          abortSignal
+        );
+        ensureNotCancelled();
+        const retryParts = retryResponse.candidates?.[0]?.content?.parts ?? [];
+        text = retryParts.find(p => p.text)?.text ?? '';
+        const latencyMs = Date.now() - startMs;
+        const standardizedUsage = mapProviderUsage(retryResponse.usageMetadata, 'gemini', { model, latencyMs });
+        console.log(`[SUCCESS] ${ts()} handleGemini() synthesis nudge complete | latencyMs: ${latencyMs}`);
+        return { text, standardizedUsage };
+      }
+
       const latencyMs = Date.now() - startMs;
       const standardizedUsage = mapProviderUsage(response.usageMetadata, 'gemini', { model, latencyMs });
       console.log(`[SUCCESS] ${ts()} handleGemini() complete | latencyMs: ${latencyMs}`);
       return { text, standardizedUsage };
+    }
+
+    // Safety cap
+    toolRounds += 1;
+    if (toolRounds > MAX_TOOL_ROUNDS) {
+      console.log(`[ERROR] ${ts()} handleGemini() exceeded max tool rounds (${MAX_TOOL_ROUNDS}) — returning partial`);
+      const latencyMs = Date.now() - startMs;
+      const standardizedUsage = mapProviderUsage(response.usageMetadata, 'gemini', { model, latencyMs });
+      return { text: 'The response required too many tool calls. Please try a more specific question.', standardizedUsage };
     }
 
     // Append model's tool-call turn and continue loop
@@ -600,14 +701,14 @@ router.post('/send', async (req, res) => {
     const { connectionId, tool } = toolEntry;
     const mcpEntry = activeClients.get(connectionId);
     if (!mcpEntry) throw new Error(`MCP connection "${connectionId}" is no longer active`);
-    console.log('aaaaaaaaaaaaaaaaaaaaaa ', activeWorkspacePath);
+    console.log(`[INIT] ${ts()} executeTool | tool: ${toolName} | workspace: ${activeWorkspacePath ?? 'unset'}`);
     const finalArgs = resolveWorkspaceToolArgs(
       toolName,
       toolArgs,
       activeWorkspacePath,
       tool?.inputSchema
     );
-    console.log('^^^^^^^^^^^^^^^^ ',finalArgs);
+    console.log(`[INIT] ${ts()} executeTool | resolved args: ${JSON.stringify(finalArgs)}`);
     const result = await withAbort(
       mcpEntry.client.callTool({ name: toolName, arguments: finalArgs }),
       abortController.signal

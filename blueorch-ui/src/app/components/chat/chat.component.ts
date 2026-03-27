@@ -7,35 +7,108 @@ import { McpService } from '../../services/mcp.service';
 import { WorkspaceService } from '../../services/workspace.service';
 import { UsageCalculatorService } from '../../services/usage-calculator.service';
 
-// ─── System Instruction Constants ───────────────────────────────────────────
+// ─── System Instruction Builder ─────────────────────────────────────────────
 
 const quotePromptPath = (path: string): string => JSON.stringify(path ?? '');
 
-const SYSTEM_PROJECT_MODE = (workspacePath: string, contextFiles: string[] = []): string => {
-  const base = [
-    'You are a Senior Systems Architect.',
-    'Use MCP tools to analyze and modify the codebase.',
+/**
+ * Builds a universal system instruction that covers:
+ *  - General knowledge / coding questions (no tools needed)
+ *  - Workspace / filesystem questions (filesystem MCP tools)
+ *  - Any other MCPs configured (Zomato, GitHub, DB, etc.)
+ *
+ * The instruction adapts at runtime based on what is actually available.
+ */
+function buildSystemInstruction(
+  workspacePath: string,
+  contextFiles: string[],
+  mcpConnections: Array<{ label: string; tools: Array<{ name: string; description: string; enabled: boolean }>; enabled: boolean }>,
+  isProjectMode: boolean,
+): string {
+  const lines: string[] = [
+    'You are a highly capable AI assistant integrated into BlueOrch Studio.',
+    'You can answer general questions, coding questions, and also interact with',
+    'real external services and the local filesystem via MCP tools.',
     '',
-    'Workspace rules:',
-    `- Active workspace root path: ${quotePromptPath(workspacePath)}`,
-    '- Treat the workspace path as an exact literal string.',
-    '- Preserve spaces exactly as written in folder and file names.',
-    '- Never rewrite, shorten, normalize, or split paths on spaces.',
-    '- When calling filesystem tools, prefer absolute paths under the active workspace root.',
-  ].join('\n');
+    '## General Behaviour',
+    '- For general or coding questions that need no external data, answer directly.',
+    '- Whenever the user asks something that an available MCP tool can answer',
+    '  (files, live data, APIs, databases, etc.) — ALWAYS call that tool.',
+    '- Never guess, hallucinate, or fabricate data that a tool can fetch.',
+    '- After calling tools, synthesise the results into a helpful, concise reply.',
+    '- If the user asks to "show", "give", "print", or "display" a file or its code:',
+    '  output the COMPLETE raw file content inside a fenced code block (``` ... ```).',
+    '  Do NOT describe or summarise — show the actual text exactly as returned by the tool.',
+    '',
+    '## Multi-Step Folder Exploration (CRITICAL)',
+    '- When the user asks about logic, code, or content INSIDE a folder:',
+    '  STEP 1 — call list_directory on that folder to get the file names.',
+    '  STEP 2 — for EACH source file returned (e.g. .js, .ts, .html, .css, .py)',
+    '           construct its FULL absolute path as: folder_path + "/" + filename.',
+    '           Example: workspace is "/Users/me/Projects", folder is "Drawing Board",',
+    '           file is "script.js" → full path = "/Users/me/Projects/Drawing Board/script.js".',
+    '           You may call read_file individually OR read_multiple_files with an array of',
+    '           full absolute paths. NEVER pass bare filenames without the folder prefix.',
+    '  STEP 3 — after reading ALL relevant files, synthesise and explain.',
+    '- NEVER stop after list_directory alone — you must read the actual file contents.',
+    '- NEVER call read_file on a directory path itself — only on individual files.',
+    '- Folder names and file names may contain spaces; pass paths verbatim, do not encode them.',
+  ];
 
-  if (contextFiles.length > 0) {
-    const fileList = contextFiles.map(f => `- ${quotePromptPath(f)}`).join('\n');
-    return `${base}\n\nFocus specifically on these selected file(s):\n${fileList}`;
+  // ── Workspace context (only when a path is set) ──────────────────────────
+  if (workspacePath) {
+    lines.push(
+      '',
+      '## Local Workspace',
+      `Active workspace root (exact literal — preserve spaces): ${quotePromptPath(workspacePath)}`,
+      '- For any file, folder, or code question: use filesystem MCP tools first.',
+      '- Resolve relative paths as: workspace_root + "/" + relative_path.',
+      '- Pass the workspace path verbatim — never encode, shorten, or split on spaces.',
+      '- Do NOT fall back to the backend server folder or home directory as the workspace root.',
+    );
+
+    if (contextFiles.length > 0) {
+      const fileList = contextFiles.map(f => `  - ${quotePromptPath(f)}`).join('\n');
+      lines.push('', '### Pinned Context Files (read these first)', fileList);
+    }
   }
 
-  return `${base}\n\nIf the user refers to the workspace, project, or current folder, they mean that exact root path.`;
-};
+  // ── Enumerate active MCP connections & their tools ───────────────────────
+  const activeMcps = mcpConnections.filter(c => c.enabled);
+  if (activeMcps.length > 0) {
+    lines.push('', '## Configured MCP Tools');
+    lines.push(
+      'The following MCP servers and tools are connected and ready to call.',
+      'Use the right tool for the right job — do not limit yourself to filesystem tools.',
+    );
+    for (const conn of activeMcps) {
+      const enabledTools = conn.tools.filter(t => t.enabled);
+      if (enabledTools.length === 0) continue;
+      lines.push(``, `### ${conn.label}`);
+      for (const tool of enabledTools) {
+        const desc = tool.description ? ` — ${tool.description}` : '';
+        lines.push(`- \`${tool.name}\`${desc}`);
+      }
+    }
+    lines.push(
+      '',
+      'When a user question maps to any of these tools, call the tool immediately.',
+      'Do not ask the user for permission to call tools — just call them.',
+    );
+  }
 
-const SYSTEM_EXPERT_MODE =
-  `You are a world-class Senior Software Engineer and Computer Science expert. ` +
-  `Provide high-performance, clean, and secure code solutions focusing on industry best practices ` +
-  `and efficient algorithms. (Note: Local workspace access is currently disabled for this query.)`;
+  // ── Project mode addendum ────────────────────────────────────────────────
+  if (isProjectMode && workspacePath) {
+    lines.push(
+      '',
+      '## Project Mode Active',
+      'The user is working on their local codebase. Treat every file/code question',
+      'as requiring a live filesystem tool read — never use recalled or invented content.',
+    );
+  }
+
+  return lines.join('\n');
+}
 
 // ─── Local view model ────────────────────────────────────────────────────────
 
@@ -220,13 +293,12 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   get systemInstruction(): string {
-    if (this.isProjectModeActive) {
-      return SYSTEM_PROJECT_MODE(
-        this.workspaceService.currentPath,
-        this.workspaceService.contextFiles,
-      );
-    }
-    return SYSTEM_EXPERT_MODE;
+    return buildSystemInstruction(
+      this.workspaceService.currentPath,
+      this.workspaceService.contextFiles,
+      this.mcpConnections,
+      this.isProjectModeActive,
+    );
   }
 
   // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -268,15 +340,17 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
     console.log(`[INIT] ${new Date().toISOString()} ChatComponent.sendMessage() | provider: ${this.selectedProviderId}`);
 
-    const activeTools = this.isProjectModeActive ? this.getActiveTools() : [];
+    // Always send tools (both modes) — Expert mode also needs filesystem access.
+    // Always send workspacePath — critical for correct path resolution in tool args.
+    const activeTools = this.getActiveTools();
+    const workspacePath = this.workspaceService.currentPath || undefined;
 
     this.chatSub = this.chatService.send({
       message: text,
       providerId: this.selectedProviderId,
       activeTools,
       systemContext: this.systemInstruction,
-      // Project Mode: send workspace path so the backend can build/reuse a cache
-      activeWorkspacePath: this.isProjectModeActive ? this.workspaceService.currentPath : undefined,
+      activeWorkspacePath: workspacePath,
     }).subscribe({
       next: (res) => {
         const turnCost = this.usageCalc.calculateCost(res.standardizedUsage);

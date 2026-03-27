@@ -6,7 +6,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const router = Router();
-const PATH_KEY_PATTERN = /(path|file|dir|directory|folder|filename)$/i;
+// Matches both singular and plural path-like argument keys, e.g. "path", "paths", "file", "files"
+const PATH_KEY_PATTERN = /(paths?|files?|dir|directory|folder|filename)$/i;
 const PATH_TEXT_PATTERN = /(absolute path|relative path|file path|directory path|folder path|workspace path|file name|filename|directory|folder|path)/i;
 
 // ─── Active Clients Map ───────────────────────────────────────────────────────
@@ -47,8 +48,22 @@ function getPathArgumentKeys(toolArgs, inputSchema) {
   }
 
   for (const [key, value] of Object.entries(toolArgs ?? {})) {
-    if (typeof value !== 'string') continue;
-    if (isPathLikeSchemaProperty(key, schemaProperties[key])) {
+    const isStr = typeof value === 'string';
+    // e.g. read_multiple_files sends { paths: ["file1.js", "file2.js"] }
+    const isStrArr = Array.isArray(value) && value.length > 0 && typeof value[0] === 'string';
+    if (!isStr && !isStrArr) continue;
+
+    if (isStrArr) {
+      // The MCP schema for array params says type:'array', which isPathLikeSchemaProperty
+      // rejects. Bypass the type check and match solely on key name / description.
+      const normalizedKey = (key ?? '').replace(/[_-]/g, '').toLowerCase();
+      if (normalizedKey === 'content') continue;
+      const sp = schemaProperties[key];
+      const descText = [sp?.description, sp?.title].filter(Boolean).join(' ');
+      if (PATH_KEY_PATTERN.test(normalizedKey) || PATH_TEXT_PATTERN.test(descText)) {
+        keys.add(key);
+      }
+    } else if (isPathLikeSchemaProperty(key, schemaProperties[key])) {
       keys.add(key);
     }
   }
@@ -85,14 +100,35 @@ function resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, input
   console.log(`[INIT] ${ts()} resolveWorkspaceToolArgs() | tool: ${toolName}`);
 
   const finalArgs = { ...(toolArgs ?? {}) };
+
+  // Only resolve paths when an explicit workspace path is supplied.
+  // Falling back to homedir() was causing relative paths to resolve against
+  // the home directory instead of the user's active workspace.
+  if (!activeWorkspacePath) {
+    console.log(`[SUCCESS] ${ts()} resolveWorkspaceToolArgs() | no activeWorkspacePath — skipping resolution | tool: ${toolName}`);
+    return finalArgs;
+  }
+
   const keysToResolve = getPathArgumentKeys(finalArgs, inputSchema);
 
   let didRewrite = false;
   for (const key of keysToResolve) {
-    const nextValue = resolveWorkspacePathValue(finalArgs[key], activeWorkspacePath || homedir());
-    if (nextValue !== undefined && nextValue !== finalArgs[key]) {
-      finalArgs[key] = nextValue;
-      didRewrite = true;
+    const val = finalArgs[key];
+    if (Array.isArray(val)) {
+      // e.g. read_multiple_files: { paths: ["Chess Board/script.js", ...] }
+      const resolvedArr = val.map(item =>
+        typeof item === 'string' ? resolveWorkspacePathValue(item, activeWorkspacePath) : item
+      );
+      if (resolvedArr.some((v, i) => v !== val[i])) {
+        finalArgs[key] = resolvedArr;
+        didRewrite = true;
+      }
+    } else {
+      const nextValue = resolveWorkspacePathValue(val, activeWorkspacePath);
+      if (nextValue !== undefined && nextValue !== val) {
+        finalArgs[key] = nextValue;
+        didRewrite = true;
+      }
     }
   }
 
@@ -311,13 +347,11 @@ router.post('/proxy', async (req, res) => {
   if (!entry) {
     return res.status(404).json({ error: `Connection "${connectionId}" not found` });
   }
-  console.log('***************************** ',activeWorkspacePath)
 
   const tool = entry.tools.find(t => t.name === toolName);
   const finalArgs = resolveWorkspaceToolArgs(toolName, toolArgs, activeWorkspacePath, tool?.inputSchema);
-console.log('##################### ',finalArgs)
-  entry.logs.push(`[BRIDGE] ${ts()} Proxy tool: ${toolName} | args: ${JSON.stringify(finalArgs)}`);
-  console.log(`[INIT] ${ts()} /mcp/proxy | tool: ${toolName} | connection: ${connectionId}`);
+  entry.logs.push(`[BRIDGE] ${ts()} Proxy tool: ${toolName} | workspace: ${activeWorkspacePath ?? 'unset'} | args: ${JSON.stringify(finalArgs)}`);
+  console.log(`[INIT] ${ts()} /mcp/proxy | tool: ${toolName} | workspace: ${activeWorkspacePath ?? 'unset'} | connection: ${connectionId}`);
 
   try {
     const result = await entry.client.callTool({ name: toolName, arguments: finalArgs });
